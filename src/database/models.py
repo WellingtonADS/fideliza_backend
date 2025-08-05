@@ -10,7 +10,20 @@ from typing import List
 class Base(DeclarativeBase):
     pass
 
-# NOVO: Tabela para registrar transações de pontos
+class Reward(Base):
+    __tablename__ = "rewards"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    points_required: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
+
+    company: Mapped["Company"] = relationship()
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now)
+
+
 class PointTransaction(Base):
     __tablename__ = "point_transactions"
 
