@@ -75,7 +75,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- 8. Concede as permissões necessárias para o utilizador da aplicação
-GRANT ALL PRIVILEGES ON TABLE users, companies, point_transactions TO fideliza_user;
+GRANT ALL PRIVILEGES ON TABLE users, companies, point_transactions, rewards TO fideliza_user;
 GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO fideliza_user;
 GRANT USAGE, SELECT ON SEQUENCE companies_id_seq TO fideliza_user;
 GRANT USAGE, SELECT ON SEQUENCE point_transactions_id_seq TO fideliza_user;
