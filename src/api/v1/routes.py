@@ -10,15 +10,14 @@ from typing import List
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
-    PointsByCompany # NOVO: Importa o esquema de resposta de pontos
+    PointsByCompany, RewardCreate, RewardResponse
 )
-# AJUSTE: Importa o modelo PointTransaction
-from ...database.models import User, Company, PointTransaction
+from ...database.models import User, Company, PointTransaction, Reward
 from ...database.session import get_db
 from ...core.security import (
     verify_password, get_password_hash, create_access_token,
     get_current_active_user, get_current_admin_user,
-    get_current_collaborator_or_admin # AJUSTE: Importa a dependência de segurança
+    get_current_collaborator_or_admin
 )
 from ...core.config import settings
 
@@ -204,3 +203,55 @@ async def get_my_points(
     ]
 
     return response_data
+
+# --- NOVOS ENDPOINTS: Gestão de Recompensas ---
+
+@router.post("/rewards/", response_model=RewardResponse, status_code=status.HTTP_201_CREATED)
+async def create_reward(
+    reward: RewardCreate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Cria um novo prémio (recompensa) para a empresa.
+    Apenas um usuário autenticado do tipo 'ADMIN' pode executar esta ação.
+    """
+    company_id = current_admin.company_id
+    if not company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrador não está associado a nenhuma empresa."
+        )
+
+    new_reward = Reward(
+        **reward.model_dump(),
+        company_id=company_id
+    )
+    
+    db.add(new_reward)
+    await db.commit()
+    await db.refresh(new_reward)
+    
+    return new_reward
+
+@router.get("/rewards/", response_model=List[RewardResponse])
+async def list_company_rewards(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_collaborator_or_admin)
+):
+    """
+    Lista todos os prémios de uma empresa.
+    Acessível para 'ADMIN' e 'COLLABORATOR'.
+    """
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário não está associado a nenhuma empresa."
+        )
+    
+    result = await db.execute(
+        select(Reward).filter(Reward.company_id == company_id)
+    )
+    rewards = result.scalars().all()
+    return rewards
