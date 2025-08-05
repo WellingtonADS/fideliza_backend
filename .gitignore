@@ -1,0 +1,36 @@
+# Byte-code compilado do Python
+__pycache__/
+*.pyc
+
+# Ficheiros de ambiente (MUITO IMPORTANTE PARA A SEGURANÇA)
+# Contém senhas, tokens e chaves de API
+.env
+.env.*
+*.env
+
+# Pastas de ambientes virtuais
+venv/
+venv.bak/
+env/
+env.bak/
+.venv/
+.env/
+*/.env
+*/.venv
+
+# Ficheiros de log e de base de dados temporários
+*.log
+*.db
+*.sqlite3
+
+# Ficheiros de configuração do editor/IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Ficheiros do sistema operativo
+.DS_Store
+Thumbs.db
