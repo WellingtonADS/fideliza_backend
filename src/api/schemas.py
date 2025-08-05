@@ -1,7 +1,25 @@
 # fideliza_backend/src/api/schemas.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
+
+# --- Esquemas para Recompensas ---
+
+class RewardBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    points_required: int = Field(gt=0, description="Os pontos necessários devem ser maiores que zero")
+
+class RewardCreate(RewardBase):
+    pass
+
+class RewardResponse(RewardBase):
+    id: int
+    company_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # --- Esquemas para Pontuação ---
 
@@ -73,7 +91,7 @@ class CompanyResponse(CompanyBase):
     class Config:
         from_attributes = True
 
-# --- NOVOS ESQUEMAS: Para Consulta de Pontos do Cliente ---
+# --- Esquemas: Para Consulta de Pontos do Cliente ---
 
 class CompanyInfoForPoints(BaseModel):
     id: int
