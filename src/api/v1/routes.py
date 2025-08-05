@@ -10,7 +10,7 @@ from typing import List
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
-    PointsByCompany, RewardCreate, RewardResponse
+    PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse
 )
 from ...database.models import User, Company, PointTransaction, Reward
 from ...database.session import get_db
@@ -255,3 +255,81 @@ async def list_company_rewards(
     )
     rewards = result.scalars().all()
     return rewards
+# --- Endpoints de Gestão de Recompensas (Admin/Colaborador) ---
+
+@router.post("/rewards/", response_model=RewardResponse, status_code=status.HTTP_201_CREATED)
+async def create_reward(
+    reward: RewardCreate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    company_id = current_admin.company_id
+    if not company_id:
+        raise HTTPException(status_code=403, detail="Administrador não está associado a nenhuma empresa.")
+    new_reward = Reward(**reward.model_dump(), company_id=company_id)
+    db.add(new_reward)
+    await db.commit()
+    await db.refresh(new_reward)
+    return new_reward
+
+@router.get("/rewards/", response_model=List[RewardResponse])
+async def list_company_rewards(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_collaborator_or_admin)
+):
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=403, detail="Usuário não está associado a nenhuma empresa.")
+    result = await db.execute(select(Reward).filter(Reward.company_id == company_id))
+    rewards = result.scalars().all()
+    return rewards
+
+# --- NOVO ENDPOINT: Status de Recompensas para o Cliente ---
+
+@router.get("/rewards/my-status", response_model=List[RewardStatusResponse])
+async def get_my_rewards_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retorna uma lista de todos os prémios das empresas onde o cliente tem pontos,
+    indicando se cada prémio pode ser resgatado.
+    """
+    if current_user.user_type != 'CLIENT':
+        raise HTTPException(status_code=403, detail="Apenas clientes podem consultar o status de seus prémios.")
+
+    # 1. Obter o total de pontos do cliente por empresa
+    points_query = (
+        select(
+            PointTransaction.company_id,
+            func.sum(PointTransaction.points).label("total_points")
+        )
+        .filter(PointTransaction.client_id == current_user.id)
+        .group_by(PointTransaction.company_id)
+    )
+    points_result = await db.execute(points_query)
+    client_points_map = {company_id: total for company_id, total in points_result.all()}
+
+    if not client_points_map:
+        return [] # Retorna lista vazia se o cliente não tiver pontos em nenhuma empresa
+
+    # 2. Obter todos os prémios das empresas relevantes
+    company_ids = list(client_points_map.keys())
+    rewards_query = select(Reward).filter(Reward.company_id.in_(company_ids))
+    rewards_result = await db.execute(rewards_query)
+    all_rewards = rewards_result.scalars().all()
+
+    # 3. Processar e enriquecer os dados dos prémios
+    response_data = []
+    for reward in all_rewards:
+        client_points_in_company = client_points_map.get(reward.company_id, 0)
+        points_needed = reward.points_required - client_points_in_company
+        
+        reward_status = RewardStatusResponse(
+            **reward.__dict__,
+            redeemable=(client_points_in_company >= reward.points_required),
+            points_to_redeem=max(0, points_needed)
+        )
+        response_data.append(reward_status)
+        
+    return response_data
