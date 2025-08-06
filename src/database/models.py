@@ -10,6 +10,28 @@ from typing import List
 class Base(DeclarativeBase):
     pass
 
+# NOVO: Tabela para o histórico de prémios resgatados
+class RedeemedReward(Base):
+    __tablename__ = "redeemed_rewards"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    reward_id: Mapped[int] = mapped_column(ForeignKey("rewards.id"), nullable=False)
+    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
+    
+    # ID do admin/colaborador que autorizou o resgate (pode ser nulo se for automático)
+    authorized_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    
+    points_spent: Mapped[int] = mapped_column(Integer, nullable=False)
+    redeemed_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now)
+
+    # Relacionamentos
+    reward: Mapped["Reward"] = relationship(foreign_keys=[reward_id])
+    client: Mapped["User"] = relationship(foreign_keys=[client_id])
+    authorized_by: Mapped["User"] = relationship(foreign_keys=[authorized_by_id])
+
+
 class Reward(Base):
     __tablename__ = "rewards"
 
@@ -30,14 +52,12 @@ class PointTransaction(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     points: Mapped[int] = mapped_column(Integer, default=1)
     
-    # Relacionamentos
     client_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
-    awarded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False) # ID do admin/colaborador
+    awarded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now)
 
-    # Relacionamentos para fácil acesso (opcional, mas útil)
     client: Mapped["User"] = relationship(foreign_keys=[client_id])
     company: Mapped["Company"] = relationship()
     awarded_by: Mapped["User"] = relationship(foreign_keys=[awarded_by_id])
@@ -63,7 +83,6 @@ class User(Base):
     def generate_qr_code(self):
         if self.id is None:
             return
-        # O conteúdo do QR Code será simplesmente o ID do usuário para fácil identificação
         qr_content = str(self.id)
         qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
         qr.add_data(qr_content)
@@ -93,4 +112,3 @@ class Company(Base):
 
     def __repr__(self):
         return f"<Company(id={self.id}, name='{self.name}')>"
-
