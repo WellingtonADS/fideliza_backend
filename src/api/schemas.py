@@ -21,10 +21,23 @@ class RewardResponse(RewardBase):
     class Config:
         from_attributes = True
 
-# NOVO: Esquema para o cliente ver o estado dos prémios
 class RewardStatusResponse(RewardResponse):
-    redeemable: bool  # Indica se o cliente pode resgatar o prémio
-    points_to_redeem: int # Pontos que faltam para o resgate
+    redeemable: bool
+    points_to_redeem: int
+
+# NOVO: Esquemas para o resgate de prémios
+class RewardRedeemRequest(BaseModel):
+    reward_id: int
+
+class RedeemedRewardResponse(BaseModel):
+    id: int
+    reward_id: int
+    client_id: int
+    points_spent: int
+    redeemed_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # --- Esquemas para Pontuação ---
 
