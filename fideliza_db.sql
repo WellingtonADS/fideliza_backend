@@ -1,12 +1,16 @@
+-- Script SQL Completo para o Projeto Fideliza+ (Fim da Fase 2)
+-- Este script cria toda a estrutura de base de dados necessária para a aplicação.
+
 -- Apaga as tabelas antigas em ordem para evitar erros de dependência.
 -- CUIDADO: Isto apaga todos os dados. Use apenas em desenvolvimento.
+-- DROP TABLE IF EXISTS redeemed_rewards;
 -- DROP TABLE IF EXISTS rewards;
 -- DROP TABLE IF EXISTS point_transactions;
 -- DROP TABLE IF EXISTS companies CASCADE;
 -- DROP TABLE IF EXISTS users CASCADE;
 
 
--- 1. Cria a tabela 'companies'
+-- 1. Tabela 'companies'
 CREATE TABLE companies (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
@@ -15,7 +19,7 @@ CREATE TABLE companies (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 2. Cria a tabela 'users'
+-- 2. Tabela 'users'
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -34,7 +38,7 @@ ADD CONSTRAINT fk_admin_user
 FOREIGN KEY (admin_user_id)
 REFERENCES users(id);
 
--- 4. Cria a tabela 'point_transactions'
+-- 4. Tabela 'point_transactions'
 CREATE TABLE point_transactions (
     id SERIAL PRIMARY KEY,
     points INTEGER NOT NULL DEFAULT 1,
@@ -44,7 +48,7 @@ CREATE TABLE point_transactions (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 5. NOVO: Cria a tabela 'rewards'
+-- 5. Tabela 'rewards'
 CREATE TABLE rewards (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -54,7 +58,18 @@ CREATE TABLE rewards (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 6. Cria a função de gatilho (trigger) para atualizar 'updated_at'
+-- 6. Tabela 'redeemed_rewards'
+CREATE TABLE redeemed_rewards (
+    id SERIAL PRIMARY KEY,
+    reward_id INTEGER NOT NULL REFERENCES rewards(id),
+    client_id INTEGER NOT NULL REFERENCES users(id),
+    company_id INTEGER NOT NULL REFERENCES companies(id),
+    authorized_by_id INTEGER REFERENCES users(id),
+    points_spent INTEGER NOT NULL,
+    redeemed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 7. Função de gatilho (trigger) para atualizar 'updated_at'
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -63,7 +78,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- 7. Aplica o gatilho às tabelas
+-- 8. Aplica o gatilho às tabelas
 CREATE TRIGGER update_users_updated_at
 BEFORE UPDATE ON users
 FOR EACH ROW
@@ -74,9 +89,8 @@ BEFORE UPDATE ON companies
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- 8. Concede as permissões necessárias para o utilizador da aplicação
-GRANT ALL PRIVILEGES ON TABLE users, companies, point_transactions, rewards TO fideliza_user;
-GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO fideliza_user;
-GRANT USAGE, SELECT ON SEQUENCE companies_id_seq TO fideliza_user;
-GRANT USAGE, SELECT ON SEQUENCE point_transactions_id_seq TO fideliza_user;
-GRANT USAGE, SELECT ON SEQUENCE rewards_id_seq TO fideliza_user;
+-- 9. Concede as permissões necessárias para o utilizador da aplicação
+-- IMPORTANTE: SUBSTITUA 'seu_usuario_da_app' PELO SEU UTILIZADOR REAL DO FICHEIRO .env
+GRANT ALL PRIVILEGES ON TABLE users, companies, point_transactions, rewards, redeemed_rewards TO fideliza_user;
+GRANT USAGE, SELECT ON SEQUENCE users_id_seq, companies_id_seq, point_transactions_id_seq, rewards_id_seq, redeemed_rewards_id_seq TO fideliza_user;
+
