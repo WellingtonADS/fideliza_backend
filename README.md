@@ -1,111 +1,86 @@
-Fideliza+ API (Backend)
-Bem-vindo ao repositório do backend do Fideliza+, um sistema de fidelização de clientes construído com tecnologias modernas, rápidas e robustas.
+# **Fideliza+ API (Backend)**
 
-Este projeto representa a conclusão bem-sucedida da Fase 1 (MVP), fornecendo a base completa para a gestão de utilizadores, empresas e o sistema de pontuação.
+Bem-vindo ao repositório do backend do **Fideliza+**, um sistema de fidelização de clientes construído com tecnologias modernas, rápidas e robustas.
 
-✨ Funcionalidades (Marco MVP Concluído)
-Gestão de Utilizadores:
+## **milestone Marco de Projeto: Conclusão da Fase 2**
 
-Registo de Clientes com geração automática de QR Code.
+Este repositório reflete a conclusão bem-sucedida da **Fase 2: Gestão de Recompensas e Visibilidade Expandida**. Todas as funcionalidades essenciais para o ciclo de vida de pontos e prémios estão implementadas, testadas e estáveis.
 
-Registo de Empresas com um utilizador Administrador inicial.
+### **Funcionalidades da Fase 1 (MVP \- Concluído)**
 
-Registo de Colaboradores por um Administrador.
+* Gestão completa de Utilizadores (Clientes, Admins, Colaboradores).  
+* Autenticação segura com tokens JWT.  
+* Sistema de atribuição de pontos.  
+* Consulta de saldo de pontos pelo cliente.
 
-Autenticação Segura:
+### **✨ Novas Funcionalidades da Fase 2 (Concluído)**
 
-Sistema de login baseado em token JWT (OAuth2).
+* **Gestão de Prémios:**  
+  * POST /rewards/: Endpoint para Administradores criarem prémios (recompensas) com um custo de pontos definido.  
+  * GET /rewards/: Endpoint para Administradores e Colaboradores listarem os prémios da sua empresa.  
+* **Visibilidade para o Cliente:**  
+  * GET /rewards/my-status: Endpoint para o cliente ver todos os prémios das empresas onde tem pontos, com o estado (redeemable) e os pontos em falta para cada um.  
+* **Ciclo de Resgate de Prémios:**  
+  * POST /rewards/redeem: Endpoint para o cliente "gastar" os seus pontos e resgatar um prémio. A lógica deduz os pontos do saldo do cliente e regista o resgate.
 
-Hash seguro de senhas utilizando passlib e bcrypt.
+## **🛠️ Tecnologias Utilizadas**
 
-Sistema de Pontuação:
+* **Framework:** [FastAPI](https://fastapi.tiangolo.com/)  
+* **Base de Dados:** [PostgreSQL](https://www.postgresql.org/)  
+* **ORM:** [SQLAlchemy](https://www.sqlalchemy.org/) (com suporte asyncio)  
+* **Validação de Dados:** [Pydantic](https://www.google.com/search?q=https://docs.pydantic.dev/)  
+* **Autenticação:** JWT com python-jose e passlib
 
-Endpoint protegido para que Administradores e Colaboradores possam atribuir pontos a um cliente.
+## **🚀 Como Executar o Projeto Localmente**
 
-Endpoint para que os Clientes possam consultar o seu saldo de pontos, agrupado por empresa.
+### **1\. Pré-requisitos**
 
-Segregação de Dados: A arquitetura garante que cada empresa só pode aceder e gerir os seus próprios dados (colaboradores e transações de pontos).
+* Python 3.10+  
+* PostgreSQL a correr localmente ou num container Docker.
 
-Documentação Automática: Acesso à documentação interativa da API (Swagger UI e ReDoc).
+### **2\. Configuração do Ambiente**
 
-🛠️ Tecnologias Utilizadas
-Framework: FastAPI
+1. **Clone o repositório:**  
+   git clone https://github.com/wellingtonads/fideliza\_backend.git  
+   cd fideliza\_backend
 
-Base de Dados: PostgreSQL
+2. **Crie e ative um ambiente virtual:**  
+   \# Windows  
+   python \-m venv venv  
+   .\\venv\\Scripts\\Activate.ps1
 
-ORM: SQLAlchemy (com suporte asyncio)
+3. **Instale as dependências:**  
+   pip install \-r requirements.txt
 
-Validação de Dados: Pydantic
+4. **Configure as Variáveis de Ambiente:**  
+   * Crie um ficheiro .env na raiz do projeto e preencha as seguintes variáveis:  
+     DATABASE\_URL="postgresql+asyncpg://seu\_usuario:sua\_senha@localhost:5432/fideliza\_db"  
+     SECRET\_KEY="uma\_chave\_secreta\_muito\_longa\_e\_aleatoria\_para\_os\_tokens\_jwt"  
+     ALGORITHM="HS256"  
+     ACCESS\_TOKEN\_EXPIRE\_MINUTES=30
 
-Autenticação: JWT com python-jose e passlib
+5. **Configure a Base de Dados:**  
+   * Certifique-se de que a base de dados (fideliza\_db no exemplo) existe.  
+   * Execute o script fideliza\_db.sql para criar todas as tabelas e conceder as permissões necessárias.
 
-🚀 Como Executar o Projeto Localmente
-Siga estes passos para configurar e executar a aplicação no seu ambiente de desenvolvimento.
+### **3\. Executar a Aplicação**
 
-1. Pré-requisitos
-Python 3.10+
+uvicorn src.main:app \--reload
 
-PostgreSQL a correr localmente ou num container Docker.
+A API estará disponível em http://127.0.0.1:8000.
 
-2. Configuração do Ambiente
-Clone o repositório:
+### **4\. Aceder à Documentação**
 
-git clone https://github.com/wellingtonads/fideliza_backend.git
-cd fideliza_backend
+Para interagir e testar os endpoints, aceda à documentação automática:
 
-Crie e ative um ambiente virtual:
+* **Swagger UI:** http://127.0.0.1:8000/docs
 
-# Windows
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+## **🔮 Próximos Passos (Fase 3\)**
 
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
+O próximo grande marco de desenvolvimento é a **Fase 3: Relatórios e Melhorias Contínuas**, que incluirá:
 
-Instale as dependências:
+* **Entregável 3.1:** Serviço de Relatórios e Estatísticas para os Administradores.  
+* **Entregável 3.2:** Aprimoramento da Gestão de Utilizadores (edição e exclusão).  
+* **Entregável 3.3:** Otimizações de performance e preparação para o ambiente de produção.
 
-pip install -r requirements.txt
-
-Configure as Variáveis de Ambiente:
-
-Crie uma cópia do ficheiro .env.example (se existir) ou crie um novo ficheiro chamado .env na raiz do projeto.
-
-Preencha as seguintes variáveis:
-
-# Exemplo de .env
-DATABASE_URL="postgresql+asyncpg://seu_usuario:sua_senha@localhost:5432/fideliza_db"
-SECRET_KEY="uma_chave_secreta_muito_longa_e_aleatoria_para_os_tokens_jwt"
-ALGORITHM="HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-Configure a Base de Dados:
-
-Certifique-se de que a base de dados (fideliza_db no exemplo acima) existe no seu PostgreSQL.
-
-Execute o script fideliza_db.sql para criar todas as tabelas e conceder as permissões necessárias.
-
-3. Executar a Aplicação
-Com o ambiente virtual ativado, execute o seguinte comando:
-
-uvicorn src.main:app --reload
-
-A API estará agora disponível em http://127.0.0.1:8000.
-
-4. Aceder à Documentação
-Para interagir e testar os endpoints, aceda à documentação automática gerada pelo FastAPI:
-
-Swagger UI: http://127.0.0.1:8000/docs
-
-ReDoc: http://127.0.0.1:8000/redoc
-
-Próximos Passos (Fase 2)
-O próximo grande marco de desenvolvimento é a Fase 2: Gestão de Recompensas e Visibilidade Expandida, que incluirá:
-
-Endpoints para que os Administradores possam criar e gerir prémios.
-
-Lógica para notificar os clientes quando atingem a pontuação necessária.
-
-Endpoints para o resgate de prémios.
-
-Este projeto foi desenvolvido com o apoio e a orientação da IA da Google.
+*Este projeto foi desenvolvido com o apoio e a orientação da IA da Google.*
