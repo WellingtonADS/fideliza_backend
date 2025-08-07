@@ -1,27 +1,30 @@
-# **Fideliza+ API (Backend)**
+# **Fideliza+ API (Backend) \- Versão 1.0**
 
 Bem-vindo ao repositório do backend do **Fideliza+**, um sistema de fidelização de clientes construído com tecnologias modernas, rápidas e robustas.
 
-## **milestone Marco de Projeto: Conclusão da Fase 2**
+## **M A R C O  D E  P R O J E T O: Desenvolvimento do Backend**
 
-Este repositório reflete a conclusão bem-sucedida da **Fase 2: Gestão de Recompensas e Visibilidade Expandida**. Todas as funcionalidades essenciais para o ciclo de vida de pontos e prémios estão implementadas, testadas e estáveis.
+Este repositório representa a **conclusão bem-sucedida de todas as fases de desenvolvimento planeadas para o backend (Fases 1, 2 e 3\)**. A API está completa, funcional e estável, fornecendo todas as funcionalidades necessárias para suportar as aplicações móveis do cliente e do administrador.
 
-### **Funcionalidades da Fase 1 (MVP \- Concluído)**
+## **✨ Funcionalidades Implementadas**
 
-* Gestão completa de Utilizadores (Clientes, Admins, Colaboradores).  
-* Autenticação segura com tokens JWT.  
-* Sistema de atribuição de pontos.  
-* Consulta de saldo de pontos pelo cliente.
+### **Fase 1: Core System (MVP)**
 
-### **✨ Novas Funcionalidades da Fase 2 (Concluído)**
+* **Gestão de Utilizadores:** Registo de Clientes (com QR Code), Empresas (com Admin) e Colaboradores.  
+* **Autenticação Segura:** Sistema de login com tokens JWT (OAuth2) e hash de senhas.  
+* **Sistema de Pontuação:** Endpoints para atribuir pontos e para clientes consultarem o seu saldo.
 
-* **Gestão de Prémios:**  
-  * POST /rewards/: Endpoint para Administradores criarem prémios (recompensas) com um custo de pontos definido.  
-  * GET /rewards/: Endpoint para Administradores e Colaboradores listarem os prémios da sua empresa.  
-* **Visibilidade para o Cliente:**  
-  * GET /rewards/my-status: Endpoint para o cliente ver todos os prémios das empresas onde tem pontos, com o estado (redeemable) e os pontos em falta para cada um.  
-* **Ciclo de Resgate de Prémios:**  
-  * POST /rewards/redeem: Endpoint para o cliente "gastar" os seus pontos e resgatar um prémio. A lógica deduz os pontos do saldo do cliente e regista o resgate.
+### **Fase 2: Gestão de Recompensas e Visibilidade**
+
+* **Gestão de Prémios:** Endpoints para Admins criarem e listarem os prémios da sua empresa.  
+* **Visibilidade para o Cliente:** Endpoint para o cliente ver o seu progresso para alcançar cada prémio.  
+* **Ciclo de Resgate:** Lógica completa para um cliente resgatar um prémio, com a dedução automática dos pontos.
+
+### **Fase 3: Relatórios e Melhorias**
+
+* **Relatórios para Admins:** Endpoint que fornece um relatório resumido com as principais métricas de desempenho (pontos atribuídos, prémios resgatados, clientes únicos).  
+* **Gestão Completa de Colaboradores:** Endpoints para Admins listarem, atualizarem e excluírem os seus colaboradores.  
+* **Otimizações de Performance:** Refatoração de consultas para maior eficiência e prevenção do problema "N+1".
 
 ## **🛠️ Tecnologias Utilizadas**
 
@@ -29,7 +32,8 @@ Este repositório reflete a conclusão bem-sucedida da **Fase 2: Gestão de Reco
 * **Base de Dados:** [PostgreSQL](https://www.postgresql.org/)  
 * **ORM:** [SQLAlchemy](https://www.sqlalchemy.org/) (com suporte asyncio)  
 * **Validação de Dados:** [Pydantic](https://www.google.com/search?q=https://docs.pydantic.dev/)  
-* **Autenticação:** JWT com python-jose e passlib
+* **Autenticação:** JWT com python-jose e passlib  
+* **Servidor:** [Uvicorn](https://www.uvicorn.org/)
 
 ## **🚀 Como Executar o Projeto Localmente**
 
@@ -60,8 +64,8 @@ Este repositório reflete a conclusão bem-sucedida da **Fase 2: Gestão de Reco
      ACCESS\_TOKEN\_EXPIRE\_MINUTES=30
 
 5. **Configure a Base de Dados:**  
-   * Certifique-se de que a base de dados (fideliza\_db no exemplo) existe.  
-   * Execute o script fideliza\_db.sql para criar todas as tabelas e conceder as permissões necessárias.
+   * Certifique-se de que a base de dados (ex: fideliza\_db) existe no seu PostgreSQL.  
+   * Execute o script fideliza\_db.sql para criar todas as tabelas e conceder as permissões necessárias ao seu utilizador.
 
 ### **3\. Executar a Aplicação**
 
@@ -69,18 +73,17 @@ uvicorn src.main:app \--reload
 
 A API estará disponível em http://127.0.0.1:8000.
 
-### **4\. Aceder à Documentação**
+### **4\. Aceder à Documentação Interativa**
 
-Para interagir e testar os endpoints, aceda à documentação automática:
+Para interagir e testar todos os endpoints, aceda à documentação automática gerada pelo FastAPI:
 
 * **Swagger UI:** http://127.0.0.1:8000/docs
 
-## **🔮 Próximos Passos (Fase 3\)**
+## **🔮 Próximas Fases do Projeto**
 
-O próximo grande marco de desenvolvimento é a **Fase 3: Relatórios e Melhorias Contínuas**, que incluirá:
+Com o backend completo, o foco do desenvolvimento agora transita para a **Camada de Apresentação**:
 
-* **Entregável 3.1:** Serviço de Relatórios e Estatísticas para os Administradores.  
-* **Entregável 3.2:** Aprimoramento da Gestão de Utilizadores (edição e exclusão).  
-* **Entregável 3.3:** Otimizações de performance e preparação para o ambiente de produção.
+* **Fase 4:** Desenvolvimento do Aplicativo Móvel do Cliente em React Native.  
+* **Fase 5:** Desenvolvimento do Aplicativo Móvel de Gestão (Admin/Colaborador) em React Native.
 
 *Este projeto foi desenvolvido com o apoio e a orientação da IA da Google.*
