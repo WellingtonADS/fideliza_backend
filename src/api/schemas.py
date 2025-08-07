@@ -3,6 +3,13 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
+# --- Esquemas para Relatórios ---
+
+class CompanyReport(BaseModel):
+    total_points_awarded: int
+    total_rewards_redeemed: int
+    unique_customers: int
+
 # --- Esquemas para Recompensas ---
 
 class RewardBase(BaseModel):
@@ -25,7 +32,6 @@ class RewardStatusResponse(RewardResponse):
     redeemable: bool
     points_to_redeem: int
 
-# NOVO: Esquemas para o resgate de prémios
 class RewardRedeemRequest(BaseModel):
     reward_id: int
 
