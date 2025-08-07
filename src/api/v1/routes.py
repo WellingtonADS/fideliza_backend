@@ -1,9 +1,10 @@
 # fideliza_backend/src/api/v1/routes.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, distinct
+from sqlalchemy.orm import selectinload # Otimização: Importa o selectinload
 from datetime import timedelta
 from typing import List
 
@@ -11,7 +12,7 @@ from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
     PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
-    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport
+    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate
 )
 from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
 from ...database.session import get_db
@@ -108,6 +109,7 @@ async def create_collaborator(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin_user)
 ):
+    # ... (código existente para criar colaborador)
     result = await db.execute(select(User).filter(User.email == collaborator.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já registrado")
@@ -126,6 +128,95 @@ async def create_collaborator(
     await db.commit()
     await db.refresh(new_collaborator)
     return new_collaborator
+
+# --- Gestão de Usuários (Endpoints Protegidos) ---
+@router.get("/users/me/", response_model=UserResponse, tags=["Usuários"])
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+@router.post("/collaborators/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Usuários"])
+async def create_collaborator(
+    collaborator: CollaboratorCreate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    # ... (código existente para criar colaborador)
+    result = await db.execute(select(User).filter(User.email == collaborator.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email já registrado")
+    company_id = current_admin.company_id
+    if not company_id:
+        raise HTTPException(status_code=403, detail="Administrador não está associado a nenhuma empresa.")
+    hashed_password = get_password_hash(collaborator.password)
+    new_collaborator = User(
+        email=collaborator.email,
+        hashed_password=hashed_password,
+        name=collaborator.name,
+        user_type="COLLABORATOR",
+        company_id=company_id
+    )
+    db.add(new_collaborator)
+    await db.commit()
+    await db.refresh(new_collaborator)
+    return new_collaborator
+
+@router.get("/collaborators/", response_model=List[UserResponse], tags=["Usuários"])
+async def list_collaborators(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Lista todos os colaboradores da empresa do administrador logado.
+    """
+    company_id = current_admin.company_id
+    # OTIMIZAÇÃO: Usar options(selectinload(User.company)) pré-carrega os dados da empresa
+    # numa única consulta extra, evitando o problema de N+1 queries se precisarmos de aceder
+    # aos detalhes da empresa para cada colaborador.
+    query = (
+        select(User)
+        .filter(User.company_id == company_id, User.user_type == "COLLABORATOR")
+        .options(selectinload(User.company))
+    )
+    result = await db.execute(query)
+    collaborators = result.scalars().all()
+    return collaborators
+
+@router.patch("/collaborators/{collaborator_id}", response_model=UserResponse, tags=["Usuários"])
+async def update_collaborator(
+    collaborator_id: int,
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    # ... (código existente para atualizar colaborador)
+    company_id = current_admin.company_id
+    result = await db.execute(select(User).filter(User.id == collaborator_id))
+    db_collaborator = result.scalar_one_or_none()
+    if not db_collaborator or db_collaborator.company_id != company_id or db_collaborator.user_type != "COLLABORATOR":
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado ou não pertence a esta empresa.")
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_collaborator, key, value)
+    await db.commit()
+    await db.refresh(db_collaborator)
+    return db_collaborator
+
+@router.delete("/collaborators/{collaborator_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Usuários"])
+async def delete_collaborator(
+    collaborator_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    # ... (código existente para excluir colaborador)
+    company_id = current_admin.company_id
+    result = await db.execute(select(User).filter(User.id == collaborator_id))
+    db_collaborator = result.scalar_one_or_none()
+    if not db_collaborator or db_collaborator.company_id != company_id or db_collaborator.user_type != "COLLABORATOR":
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado ou não pertence a esta empresa.")
+    await db.delete(db_collaborator)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 # --- Pontuação ---
 @router.post("/points/add", response_model=PointTransactionResponse, status_code=status.HTTP_201_CREATED, tags=["Pontuação"])
@@ -264,8 +355,7 @@ async def redeem_reward(
     await db.refresh(new_redeemed_reward)
     return new_redeemed_reward
 
-# --- NOVO ENDPOINT: Relatório Resumido para Administradores ---
-
+# --- Relatórios (Otimizado) ---
 @router.get("/reports/summary", response_model=CompanyReport, tags=["Relatórios"])
 async def get_company_summary_report(
     db: AsyncSession = Depends(get_db),
@@ -273,7 +363,6 @@ async def get_company_summary_report(
 ):
     """
     Fornece um relatório resumido para a empresa do administrador logado.
-    Apenas um usuário autenticado do tipo 'ADMIN' pode executar esta ação.
     """
     company_id = current_admin.company_id
     if not company_id:
@@ -282,32 +371,20 @@ async def get_company_summary_report(
             detail="Administrador não está associado a nenhuma empresa."
         )
 
-    # 1. Calcular o total de pontos atribuídos (apenas transações positivas)
-    points_query = (
-        select(func.sum(PointTransaction.points))
-        .filter(
-            PointTransaction.company_id == company_id,
-            PointTransaction.points > 0
+    # OTIMIZAÇÃO: Combinamos as três consultas numa única viagem à base de dados.
+    # Isto é significativamente mais rápido e eficiente.
+    report_query = (
+        select(
+            func.coalesce(func.sum(PointTransaction.points).filter(PointTransaction.points > 0), 0),
+            func.coalesce(func.count(distinct(PointTransaction.client_id)), 0),
+            func.coalesce(func.count(RedeemedReward.id), 0)
         )
-    )
-    points_result = await db.execute(points_query)
-    total_points_awarded = points_result.scalar_one_or_none() or 0
-
-    # 2. Calcular o total de prémios resgatados
-    redeemed_query = (
-        select(func.count(RedeemedReward.id))
-        .filter(RedeemedReward.company_id == company_id)
-    )
-    redeemed_result = await db.execute(redeemed_query)
-    total_rewards_redeemed = redeemed_result.scalar_one_or_none() or 0
-
-    # 3. Calcular o número de clientes únicos
-    customers_query = (
-        select(func.count(distinct(PointTransaction.client_id)))
+        .outerjoin(RedeemedReward, RedeemedReward.company_id == PointTransaction.company_id)
         .filter(PointTransaction.company_id == company_id)
     )
-    customers_result = await db.execute(customers_query)
-    unique_customers = customers_result.scalar_one_or_none() or 0
+    
+    result = await db.execute(report_query)
+    total_points_awarded, unique_customers, total_rewards_redeemed = result.one_or_none() or (0, 0, 0)
 
     return CompanyReport(
         total_points_awarded=total_points_awarded,
