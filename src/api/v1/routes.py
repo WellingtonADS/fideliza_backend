@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 from datetime import timedelta
 from typing import List
 
@@ -11,7 +11,7 @@ from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
     PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
-    RewardRedeemRequest, RedeemedRewardResponse
+    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport
 )
 from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
 from ...database.session import get_db
@@ -263,3 +263,54 @@ async def redeem_reward(
     await db.commit()
     await db.refresh(new_redeemed_reward)
     return new_redeemed_reward
+
+# --- NOVO ENDPOINT: Relatório Resumido para Administradores ---
+
+@router.get("/reports/summary", response_model=CompanyReport, tags=["Relatórios"])
+async def get_company_summary_report(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Fornece um relatório resumido para a empresa do administrador logado.
+    Apenas um usuário autenticado do tipo 'ADMIN' pode executar esta ação.
+    """
+    company_id = current_admin.company_id
+    if not company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrador não está associado a nenhuma empresa."
+        )
+
+    # 1. Calcular o total de pontos atribuídos (apenas transações positivas)
+    points_query = (
+        select(func.sum(PointTransaction.points))
+        .filter(
+            PointTransaction.company_id == company_id,
+            PointTransaction.points > 0
+        )
+    )
+    points_result = await db.execute(points_query)
+    total_points_awarded = points_result.scalar_one_or_none() or 0
+
+    # 2. Calcular o total de prémios resgatados
+    redeemed_query = (
+        select(func.count(RedeemedReward.id))
+        .filter(RedeemedReward.company_id == company_id)
+    )
+    redeemed_result = await db.execute(redeemed_query)
+    total_rewards_redeemed = redeemed_result.scalar_one_or_none() or 0
+
+    # 3. Calcular o número de clientes únicos
+    customers_query = (
+        select(func.count(distinct(PointTransaction.client_id)))
+        .filter(PointTransaction.company_id == company_id)
+    )
+    customers_result = await db.execute(customers_query)
+    unique_customers = customers_result.scalar_one_or_none() or 0
+
+    return CompanyReport(
+        total_points_awarded=total_points_awarded,
+        total_rewards_redeemed=total_rewards_redeemed,
+        unique_customers=unique_customers
+    )
