@@ -70,6 +70,11 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+# NOVO: Esquema para atualizar dados de um usuário
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
 class UserResponse(UserBase):
     id: int
     user_type: str
