@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, distinct
-from sqlalchemy.orm import selectinload # Otimização: Importa o selectinload
+from sqlalchemy.orm import selectinload
 from datetime import timedelta
 from typing import List
 
@@ -292,29 +292,41 @@ async def get_my_rewards_status(
 ):
     if current_user.user_type != 'CLIENT':
         raise HTTPException(status_code=403, detail="Apenas clientes podem consultar o status de seus prémios.")
+    
     points_query = (
         select(PointTransaction.company_id, func.sum(PointTransaction.points).label("total_points"))
         .filter(PointTransaction.client_id == current_user.id).group_by(PointTransaction.company_id)
     )
     points_result = await db.execute(points_query)
     client_points_map = {company_id: total for company_id, total in points_result.all()}
+
     if not client_points_map:
         return []
+
     rewards_query = select(Reward).filter(Reward.company_id.in_(list(client_points_map.keys())))
     rewards_result = await db.execute(rewards_query)
     all_rewards = rewards_result.scalars().all()
+    
     response_data = []
     for reward in all_rewards:
         client_points_in_company = client_points_map.get(reward.company_id, 0)
         points_needed = reward.points_required - client_points_in_company
+        
+        # CORREÇÃO: Construir o objeto de resposta Pydantic explicitamente
+        # em vez de usar **reward.__dict__, que causa o crash.
         reward_status = RewardStatusResponse(
-            **reward.__dict__,
+            id=reward.id,
+            name=reward.name,
+            description=reward.description,
+            points_required=reward.points_required,
+            company_id=reward.company_id,
+            created_at=reward.created_at,
             redeemable=(client_points_in_company >= reward.points_required),
             points_to_redeem=max(0, points_needed)
         )
         response_data.append(reward_status)
+        
     return response_data
-
 @router.post("/rewards/redeem", response_model=RedeemedRewardResponse, status_code=status.HTTP_201_CREATED, tags=["Recompensas"])
 async def redeem_reward(
     payload: RewardRedeemRequest,
