@@ -403,3 +403,29 @@ async def get_company_summary_report(
         total_rewards_redeemed=total_rewards_redeemed,
         unique_customers=unique_customers
     )
+# NOVO ENDPOINT: Listar transações de pontos de uma empresa
+@router.get("/points/transactions/", response_model=List[PointTransactionResponse], tags=["Pontuação"])
+async def list_company_point_transactions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_collaborator_or_admin)
+):
+    """
+    Lista as últimas transações de pontos da empresa do usuário logado.
+    """
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=403, detail="Usuário não está associado a nenhuma empresa.")
+
+    query = (
+        select(PointTransaction)
+        .filter(PointTransaction.company_id == company_id)
+        .order_by(PointTransaction.created_at.desc())
+        .limit(50) # Limita às últimas 50 transações para performance
+        .options(
+            selectinload(PointTransaction.client),
+            selectinload(PointTransaction.awarded_by)
+        )
+    )
+    result = await db.execute(query)
+    transactions = result.scalars().all()
+    return transactions
