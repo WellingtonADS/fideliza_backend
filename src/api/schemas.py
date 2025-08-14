@@ -3,6 +3,15 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
+# --- Esquemas para Clientes ---
+
+class UserInfo(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
 # --- Esquemas para Relatórios ---
 
 class CompanyReport(BaseModel):
@@ -53,11 +62,9 @@ class PointAdd(BaseModel):
 class PointTransactionResponse(BaseModel):
     id: int
     points: int
-    client_id: int
-    company_id: int
-    awarded_by_id: int
+    client: UserInfo
+    awarded_by: UserInfo
     created_at: datetime
-
     class Config:
         from_attributes = True
 
@@ -80,7 +87,6 @@ class UserResponse(UserBase):
     user_type: str
     company_id: Optional[int] = None
     qr_code_base64: Optional[str] = None
-
     class Config:
         from_attributes = True
 
@@ -116,7 +122,6 @@ class CompanyAdminCreate(BaseModel):
 class CompanyResponse(CompanyBase):
     id: int
     admin_user_id: Optional[int] = None
-
     class Config:
         from_attributes = True
 
@@ -129,6 +134,5 @@ class CompanyInfoForPoints(BaseModel):
 class PointsByCompany(BaseModel):
     total_points: int
     company: CompanyInfoForPoints
-
     class Config:
         from_attributes = True
