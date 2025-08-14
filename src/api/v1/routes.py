@@ -268,7 +268,7 @@ async def add_points_to_client(
     await db.refresh(new_transaction)
     return new_transaction
 
-@router.get("/points/my-points", response_model=List[PointsByCompany], tags=["Pontuação"], summary="Consulta os pontos do cliente")
+@router.get("/points/my-points", response_model=List[PointsByCompany], tags=["Pontuação"], summary="Obtém os pontos do cliente logado por empresa")
 async def get_my_points(
     db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
@@ -312,7 +312,8 @@ async def list_company_point_transactions(
         )
     )
     result = await db.execute(query)
-    return result.scalars().all()
+    transactions = result.scalars().all()
+    return transactions
 
 # =============================================================================
 # 5. GESTÃO DE RECOMPENSAS
