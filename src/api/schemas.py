@@ -77,7 +77,6 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-# NOVO: Esquema para atualizar dados de um usuário
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -122,6 +121,28 @@ class CompanyAdminCreate(BaseModel):
 class CompanyResponse(CompanyBase):
     id: int
     admin_user_id: Optional[int] = None
+    class Config:
+        from_attributes = True
+
+# --- NOVOS ESQUEMAS PARA A EXPERIÊNCIA DO CLIENTE ---
+
+class CompanyDetails(CompanyBase):
+    """ Schema para listar empresas na tela 'Explorar'. """
+    id: int
+    logo_url: Optional[str] = None
+    address: Optional[str] = None
+    category: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class DashboardData(BaseModel):
+    """ Schema para os dados da tela principal (dashboard) do cliente. """
+    total_points: int
+    last_activity: Optional[PointTransactionResponse] = None
+    
     class Config:
         from_attributes = True
 
