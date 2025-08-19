@@ -94,3 +94,11 @@ EXECUTE FUNCTION update_updated_at_column();
 GRANT ALL PRIVILEGES ON TABLE users, companies, point_transactions, rewards, redeemed_rewards TO fideliza_user;
 GRANT USAGE, SELECT ON SEQUENCE users_id_seq, companies_id_seq, point_transactions_id_seq, rewards_id_seq, redeemed_rewards_id_seq TO fideliza_user;
 
+ALTER TABLE companies
+ADD COLUMN logo_url VARCHAR,
+ADD COLUMN address VARCHAR,
+ADD COLUMN category VARCHAR,
+ADD COLUMN latitude FLOAT,
+ADD COLUMN longitude FLOAT;
+
+CREATE INDEX ix_companies_category ON companies (category);
