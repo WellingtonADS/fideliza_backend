@@ -3,7 +3,7 @@ import datetime
 import qrcode
 import io
 import base64
-from sqlalchemy import String, DateTime, ForeignKey, Text, Integer
+from sqlalchemy import String, DateTime, ForeignKey, Text, Integer, Float # Importado Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from typing import List
 
@@ -102,6 +102,14 @@ class Company(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     
+    # --- NOVOS CAMPOS ADICIONADOS ---
+    logo_url: Mapped[str] = mapped_column(String, nullable=True)
+    address: Mapped[str] = mapped_column(String, nullable=True)
+    category: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float] = mapped_column(Float, nullable=True)
+    # ---------------------------------
+
     admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     users: Mapped[List["User"]] = relationship(back_populates="company", foreign_keys=[User.company_id])
