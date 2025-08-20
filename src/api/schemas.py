@@ -1,16 +1,13 @@
-# fideliza_backend/src/api/schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
 # --- Esquemas para Clientes ---
 
 class UserInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
-
-    class Config:
-        from_attributes = True
 
 # --- Esquemas para Relatórios ---
 
@@ -30,12 +27,10 @@ class RewardCreate(RewardBase):
     pass
 
 class RewardResponse(RewardBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     company_id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class RewardStatusResponse(RewardResponse):
     redeemable: bool
@@ -45,14 +40,12 @@ class RewardRedeemRequest(BaseModel):
     reward_id: int
 
 class RedeemedRewardResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     reward_id: int
     client_id: int
     points_spent: int
     redeemed_at: datetime
-
-    class Config:
-        from_attributes = True
 
 # --- Esquemas para Pontuação ---
 
@@ -60,13 +53,12 @@ class PointAdd(BaseModel):
     client_identifier: str
 
 class PointTransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     points: int
     client: UserInfo
     awarded_by: UserInfo
     created_at: datetime
-    class Config:
-        from_attributes = True
 
 # --- Esquemas para Usuários ---
 
@@ -82,12 +74,11 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
 
 class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     user_type: str
     company_id: Optional[int] = None
     qr_code_base64: Optional[str] = None
-    class Config:
-        from_attributes = True
 
 # --- Esquemas para Colaboradores ---
 
@@ -105,7 +96,6 @@ class TokenData(BaseModel):
     user_type: Optional[str] = None
     company_id: Optional[int] = None
 
-
 # --- Esquemas para Empresas ---
 
 class CompanyBase(BaseModel):
@@ -119,15 +109,14 @@ class CompanyAdminCreate(BaseModel):
     admin_user: UserCreate
 
 class CompanyResponse(CompanyBase):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     admin_user_id: Optional[int] = None
-    class Config:
-        from_attributes = True
 
 # --- NOVOS ESQUEMAS PARA A EXPERIÊNCIA DO CLIENTE ---
 
 class CompanyDetails(CompanyBase):
-    """ Schema para listar empresas na tela 'Explorar'. """
+    model_config = ConfigDict(from_attributes=True)
     id: int
     logo_url: Optional[str] = None
     address: Optional[str] = None
@@ -135,25 +124,19 @@ class CompanyDetails(CompanyBase):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
-    class Config:
-        from_attributes = True
-
 class DashboardData(BaseModel):
-    """ Schema para os dados da tela principal (dashboard) do cliente. """
+    model_config = ConfigDict(from_attributes=True)
     total_points: int
     last_activity: Optional[PointTransactionResponse] = None
-    
-    class Config:
-        from_attributes = True
 
 # --- Esquemas: Para Consulta de Pontos do Cliente ---
 
 class CompanyInfoForPoints(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
 
 class PointsByCompany(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     total_points: int
     company: CompanyInfoForPoints
-    class Config:
-        from_attributes = True

@@ -110,7 +110,8 @@ class Company(Base):
     longitude: Mapped[float] = mapped_column(Float, nullable=True)
     # ---------------------------------
 
-    admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", use_alter=True), nullable=True)
+
 
     users: Mapped[List["User"]] = relationship(back_populates="company", foreign_keys=[User.company_id])
     admin: Mapped["User"] = relationship(foreign_keys=[admin_user_id])

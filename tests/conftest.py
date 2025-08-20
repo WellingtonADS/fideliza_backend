@@ -1,8 +1,9 @@
 import pytest
 import asyncio
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport # <-- Importar ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from typing import AsyncGenerator
 
 # Ajuste o caminho de importação se a sua app principal não estiver em src.main
 from src.main import app
@@ -40,8 +41,6 @@ async def setup_database():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-from typing import AsyncGenerator
-
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Fornece uma sessão de base de dados para cada teste."""
@@ -50,10 +49,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await session.flush()
         await session.rollback()
 
-from typing import AsyncGenerator
-
 @pytest.fixture
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Fornece um cliente HTTP assíncrono para fazer requisições à API."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # --- CORREÇÃO APLICADA AQUI ---
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
