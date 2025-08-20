@@ -8,7 +8,7 @@ pydantic-settings
 passlib[bcrypt]
 python-multipart
 qrcode[pil]
-jose
+python-jose[cryptography]
 pytest
 pytest-asyncio
 httpx
