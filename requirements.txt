@@ -9,3 +9,6 @@ passlib[bcrypt]
 python-multipart
 qrcode[pil]
 jose
+pytest
+pytest-asyncio
+httpx
