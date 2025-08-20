@@ -1,4 +1,3 @@
-# fideliza_backend/src/api/v1/routes.py
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +11,8 @@ from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
     PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
-    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate
+    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate,
+    CompanyDetails, DashboardData # <-- NOVOS SCHEMAS IMPORTADOS
 )
 from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
 from ...database.session import get_db
@@ -500,3 +500,51 @@ async def get_company_summary_report(
         total_rewards_redeemed=total_rewards_redeemed,
         unique_customers=unique_customers
     )
+
+# =============================================================================
+# 7. CLIENT EXPERIENCE ENDPOINTS (NOVOS)
+# =============================================================================
+
+@router.get("/companies", response_model=List[CompanyDetails], tags=["Experiência do Cliente"], summary="Lista todas as empresas parceiras")
+async def get_all_companies(db: AsyncSession = Depends(get_db)):
+    """
+    Endpoint público para obter uma lista de todas as empresas parceiras.
+    Alimenta a tela "Explorar Lojas" no aplicativo do cliente.
+    """
+    result = await db.execute(select(Company))
+    companies = result.scalars().all()
+    return companies
+
+@router.get("/dashboard", response_model=DashboardData, tags=["Experiência do Cliente"], summary="Obtém os dados do dashboard do cliente")
+async def get_client_dashboard(
+    current_user: User = Depends(get_current_active_user), 
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint para o dashboard do cliente.
+    Retorna o total de pontos e a última atividade de pontuação.
+    Acessível apenas por 'CLIENTE'.
+    """
+    if current_user.user_type != 'CLIENT':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a clientes")
+
+    # Calcula o total de pontos do cliente em todas as empresas
+    total_points_query = select(func.sum(PointTransaction.points)).where(PointTransaction.client_id == current_user.id)
+    total_points_result = await db.execute(total_points_query)
+    total_points = total_points_result.scalar_one_or_none() or 0
+
+    # Busca a última transação de pontos
+    last_transaction_query = (
+        select(PointTransaction)
+        .where(PointTransaction.client_id == current_user.id)
+        .order_by(PointTransaction.created_at.desc())
+        .limit(1)
+        .options(
+            selectinload(PointTransaction.client),
+            selectinload(PointTransaction.awarded_by)
+        )
+    )
+    last_transaction_result = await db.execute(last_transaction_query)
+    last_transaction = last_transaction_result.scalar_one_or_none()
+
+    return DashboardData(total_points=total_points, last_activity=last_transaction)
