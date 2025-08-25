@@ -245,6 +245,15 @@ async def register_company_and_admin(
 # 3. GESTÃO DE UTILIZADORES (ADMIN & PERFIL)
 # =============================================================================
 
+@router.get("/users/me", response_model=UserResponse, tags=["Utilizadores"], summary="Obtém os dados do utilizador logado")
+async def get_current_user_details(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retorna os detalhes do utilizador atualmente autenticado.
+    """
+    return current_user
+
 @router.patch("/users/me", response_model=UserResponse, tags=["Utilizadores"], summary="Atualiza os dados do utilizador logado")
 async def update_current_user(
     payload: UserUpdate,
