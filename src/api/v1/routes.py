@@ -6,13 +6,17 @@ from sqlalchemy import func, distinct
 from sqlalchemy.orm import selectinload
 from datetime import timedelta
 from typing import List
+from fastapi import BackgroundTasks
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from pydantic import EmailStr
+from jose import jwt, JWTError
 
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
     PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
     RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate,
-    CompanyDetails, DashboardData # <-- NOVOS SCHEMAS IMPORTADOS
+    CompanyDetails, DashboardData, PasswordRecoveryRequest, PasswordReset # <-- NOVOS SCHEMAS IMPORTADOS
 )
 from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
 from ...database.session import get_db
@@ -22,6 +26,19 @@ from ...core.security import (
     get_current_collaborator_or_admin
 )
 from ...core.config import settings
+
+# Configuração do FastMail
+conf = ConnectionConfig(
+    MAIL_USERNAME = settings.MAIL_USERNAME,
+    MAIL_PASSWORD = settings.MAIL_PASSWORD,
+    MAIL_FROM = settings.MAIL_FROM,
+    MAIL_PORT = settings.MAIL_PORT,
+    MAIL_SERVER = settings.MAIL_SERVER,
+    MAIL_STARTTLS = settings.MAIL_STARTTLS, # <-- Nome corrigido
+    MAIL_SSL_TLS = settings.MAIL_SSL_TLS,   # <-- Nome corrigido
+    USE_CREDENTIALS = True,
+    VALIDATE_CERTS = True
+)
 
 router = APIRouter()
 
@@ -58,6 +75,102 @@ async def login_for_access_token(
         expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/request-password-recovery", status_code=status.HTTP_200_OK, tags=["Autenticação"])
+async def request_password_recovery(
+    payload: PasswordRecoveryRequest, 
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Inicia o processo de recuperação de senha.
+    """
+    result = await db.execute(select(User).filter(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        # Gera um token de acesso de curta duração (ex: 15 minutos) para a recuperação
+        password_reset_token = create_access_token(
+            data={"sub": user.email, "purpose": "password-reset"},
+            expires_delta=timedelta(minutes=15)
+        )
+
+        # Prepara o e-mail
+        message = MessageSchema(
+            subject="Recuperação de Senha - Fideliza+",
+            recipients=[user.email],
+            body=f"""
+            Olá {user.name},
+
+            Você solicitou a redefinição da sua senha.
+
+            Por favor, use o seguinte token para redefinir a sua senha: {password_reset_token}
+
+            Se você не solicitou isto, por favor ignore este e-mail.
+
+            Obrigado,
+            Equipa Fideliza+
+            """,
+            subtype=MessageType.plain
+        )
+
+        # Envia o e-mail em segundo plano
+        fm = FastMail(conf)
+        background_tasks.add_task(fm.send_message, message)
+    
+
+    # Retornamos sempre a mesma mensagem para não revelar se um e-mail existe ou não
+    return {"message": "Se existir uma conta com este e-mail, um link de recuperação foi enviado."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK, tags=["Autenticação"])
+async def reset_password(
+    payload: PasswordReset,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Redefine a senha do utilizador usando um token de recuperação válido.
+    """
+    try:
+        token_data = jwt.decode(
+            payload.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+
+        # Valida se o token foi criado para este propósito
+        if token_data.get("purpose") != "password-reset":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido para redefinição de senha",
+            )
+
+        email: str = token_data.get("sub")
+        if email is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido",
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado",
+        )
+
+    result = await db.execute(select(User).filter(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utilizador não encontrado",
+        )
+
+    # Atualiza a senha
+    hashed_password = get_password_hash(payload.new_password)
+    user.hashed_password = hashed_password
+    await db.commit()
+
+    return {"message": "Senha redefinida com sucesso."}
 
 # =============================================================================
 # 2. REGISTO DE NOVOS UTILIZADORES E EMPRESAS
@@ -547,4 +660,8 @@ async def get_client_dashboard(
     last_transaction_result = await db.execute(last_transaction_query)
     last_transaction = last_transaction_result.scalar_one_or_none()
 
-    return DashboardData(total_points=total_points, last_activity=last_transaction)
+    return DashboardData(
+        total_points=total_points,
+        last_activity=last_transaction,
+        qr_code_base64=current_user.qr_code_base64 # <-- Adicione esta linha
+    )
