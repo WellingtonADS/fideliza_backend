@@ -16,7 +16,7 @@ from ..schemas import (
     CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
     PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
     RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate,
-    CompanyDetails, DashboardData, PasswordRecoveryRequest, PasswordReset # <-- NOVOS SCHEMAS IMPORTADOS
+    CompanyDetails, DashboardData, PasswordRecoveryRequest, PasswordReset 
 )
 from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
 from ...database.session import get_db
@@ -107,9 +107,9 @@ async def request_password_recovery(
 
             Você solicitou a redefinição da sua senha.
 
-            Por favor, use o seguinte token para redefinir a sua senha: {password_reset_token}
+            Por favor, use o seguinte link para redefinir a sua senha: {reset_link}
 
-            Se você не solicitou isto, por favor ignore este e-mail.
+            Se você não solicitou isto, por favor ignore este e-mail.
 
             Obrigado,
             Equipa Fideliza+
@@ -245,9 +245,27 @@ async def register_company_and_admin(
 # 3. GESTÃO DE UTILIZADORES (ADMIN & PERFIL)
 # =============================================================================
 
-@router.get("/users/me/", response_model=UserResponse, tags=["Utilizadores"], summary="Obtém os dados do utilizador logado")
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
-    """Retorna os detalhes do utilizador atualmente autenticado."""
+@router.patch("/users/me", response_model=UserResponse, tags=["Utilizadores"], summary="Atualiza os dados do utilizador logado")
+async def update_current_user(
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Permite que o utilizador autenticado atualize o seu próprio nome ou senha.
+    """
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "name" in update_data:
+        current_user.name = update_data["name"]
+    
+    if "password" in update_data and update_data["password"]:
+        hashed_password = get_password_hash(update_data["password"])
+        current_user.hashed_password = hashed_password
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
     return current_user
 
 @router.post("/collaborators/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Utilizadores"], summary="Cria um novo colaborador")
