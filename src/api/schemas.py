@@ -87,6 +87,10 @@ class CollaboratorCreate(UserCreate):
 
 # --- Esquemas para Autenticação (Token) ---
 
+# Em schemas.py
+class PasswordRecoveryRequest(BaseModel):
+    email: EmailStr
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -95,6 +99,11 @@ class TokenData(BaseModel):
     email: Optional[str] = None
     user_type: Optional[str] = None
     company_id: Optional[int] = None
+
+# Em schemas.py
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str
 
 # --- Esquemas para Empresas ---
 
@@ -128,6 +137,7 @@ class DashboardData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     total_points: int
     last_activity: Optional[PointTransactionResponse] = None
+    qr_code_base64: Optional[str] = None # <-- Adicione esta linha
 
 # --- Esquemas: Para Consulta de Pontos do Cliente ---
 
