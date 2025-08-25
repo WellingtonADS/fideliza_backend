@@ -82,6 +82,7 @@ async def request_password_recovery(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
+
     """
     Inicia o processo de recuperação de senha.
     """
@@ -94,6 +95,8 @@ async def request_password_recovery(
             data={"sub": user.email, "purpose": "password-reset"},
             expires_delta=timedelta(minutes=15)
         )
+
+        reset_link = f"fidelizacliente://reset-password?token={password_reset_token}"
 
         # Prepara o e-mail
         message = MessageSchema(
