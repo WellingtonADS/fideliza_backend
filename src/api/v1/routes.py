@@ -10,7 +10,6 @@ from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
 from jose import jwt, JWTError
-from sqlalchemy.orm import selectinload
 
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
@@ -35,8 +34,8 @@ conf = ConnectionConfig(
     MAIL_FROM = settings.MAIL_FROM,
     MAIL_PORT = settings.MAIL_PORT,
     MAIL_SERVER = settings.MAIL_SERVER,
-    MAIL_STARTTLS = settings.MAIL_STARTTLS, # <-- Nome corrigido
-    MAIL_SSL_TLS = settings.MAIL_SSL_TLS,   # <-- Nome corrigido
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,
     USE_CREDENTIALS = True,
     VALIDATE_CERTS = True
 )
@@ -410,7 +409,13 @@ async def add_points_to_client(
     db.add(new_transaction)
     await db.commit()
     await db.refresh(new_transaction)
-    return new_transaction
+    # Recarrega a transação com as relações para a resposta
+    result = await db.execute(
+        select(PointTransaction)
+        .where(PointTransaction.id == new_transaction.id)
+        .options(selectinload(PointTransaction.client), selectinload(PointTransaction.awarded_by))
+    )
+    return result.scalar_one()
 
 @router.get("/points/my-points", response_model=List[PointsByCompany], tags=["Pontuação"], summary="Obtém os pontos do cliente logado por empresa")
 async def get_my_points(
@@ -447,13 +452,15 @@ async def list_company_point_transactions(
 
     query = (
         select(PointTransaction)
-        .filter(PointTransaction.company_id == company_id)
-        .order_by(PointTransaction.created_at.desc())
-        .limit(50) # Limita às últimas 50 transações para performance
+        .where(
+            PointTransaction.client_id == current_user.id,
+            PointTransaction.company_id == company_id
+        )
         .options(
-            selectinload(PointTransaction.client), # Otimização para pré-carregar dados
+            selectinload(PointTransaction.client), 
             selectinload(PointTransaction.awarded_by)
         )
+        .order_by(PointTransaction.created_at.desc())
     )
     result = await db.execute(query)
     transactions = result.scalars().all()
