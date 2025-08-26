@@ -10,6 +10,7 @@ from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
 from jose import jwt, JWTError
+from sqlalchemy.orm import selectinload
 
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
@@ -481,6 +482,7 @@ async def get_my_transactions_for_company(
             PointTransaction.client_id == current_user.id,
             PointTransaction.company_id == company_id
         )
+        .options(selectinload(PointTransaction.awarded_by))
         .order_by(PointTransaction.created_at.desc())
     )
     result = await db.execute(query)
