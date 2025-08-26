@@ -79,6 +79,17 @@ class UserResponse(UserBase):
     user_type: str
     company_id: Optional[int] = None
     qr_code_base64: Optional[str] = None
+    class Config:
+        from_attributes = True # ou orm_mode = True
+
+class PointTransactionResponse(BaseModel):
+    id: int
+    points: int
+    created_at: datetime
+    awarded_by: Optional[UserResponse] = None # Garanta que a resposta do usuário está aqui
+
+    class Config:
+        from_attributes = True # Adicione esta configuração
 
 # --- Esquemas para Colaboradores ---
 
