@@ -2,7 +2,9 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from .api.v1.routes import router as api_router
+# CORREÇÃO: Importar 'router' diretamente, sem renomear
+from .api.v1.routes import router
+
 from .database import models
 
 @asynccontextmanager
@@ -12,4 +14,6 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(api_router, prefix="/api/v1")
+
+# CORREÇÃO: Utilizar o objeto 'router' que foi importado
+app.include_router(router, prefix="/api/v1")
