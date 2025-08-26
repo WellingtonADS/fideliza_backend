@@ -458,6 +458,37 @@ async def list_company_point_transactions(
     transactions = result.scalars().all()
     return transactions
 
+@router.get(
+    "/points/my-transactions/{company_id}",
+    response_model=List[PointTransactionResponse],
+    summary="Obtém as transações do cliente para uma empresa específica",
+    tags=["Pontuação"]
+)
+async def get_my_transactions_for_company(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Retorna o histórico de transações do cliente logado para uma empresa específica.
+    """
+    if current_user.user_type != 'CLIENT':
+        raise HTTPException(status_code=403, detail="Apenas clientes podem aceder.")
+
+    query = (
+        select(PointTransaction)
+        .where(
+            PointTransaction.client_id == current_user.id,
+            PointTransaction.company_id == company_id
+        )
+        .order_by(PointTransaction.created_at.desc())
+    )
+    result = await db.execute(query)
+    transactions = result.scalars().all()
+    return transactions
+
+
+
 # =============================================================================
 # 5. GESTÃO DE RECOMPENSAS
 # =============================================================================
