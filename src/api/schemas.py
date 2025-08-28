@@ -56,6 +56,7 @@ class TokenData(BaseModel):
 
 class PasswordRecoveryRequest(BaseModel):
     email: EmailStr
+    app_type: str = 'client'
 
 class PasswordReset(BaseModel):
     token: str
@@ -121,6 +122,12 @@ class RewardBase(BaseModel):
 
 class RewardCreate(RewardBase):
     pass
+
+class RewardUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    points_required: Optional[int] = Field(None, gt=0)
+
 
 class RewardResponse(RewardBase):
     model_config = ConfigDict(from_attributes=True)
