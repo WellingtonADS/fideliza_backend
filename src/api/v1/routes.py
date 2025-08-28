@@ -96,7 +96,10 @@ async def request_password_recovery(
             expires_delta=timedelta(minutes=15)
         )
 
-        reset_link = f"fidelizacliente://reset-password?token={password_reset_token}"
+        if payload.app_type == 'gestao':
+            reset_link = f"fidelizagestao://reset-password?token={password_reset_token}"
+        else: # O padrão é 'client'
+            reset_link = f"fidelizacliente://reset-password?token={password_reset_token}"
 
         # Prepara o e-mail
         message = MessageSchema(
