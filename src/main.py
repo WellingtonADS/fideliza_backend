@@ -2,18 +2,22 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-# CORREÇÃO: Importar 'router' diretamente, sem renomear
+# Importar o router das rotas da API
 from .api.v1.routes import router
 
-from .database import models
+# 1. IMPORTAR A FUNÇÃO PARA CRIAR AS TABELAS
+from .database.session import create_db_and_tables
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Iniciando a aplicação...")
+    # 2. CHAMAR A FUNÇÃO PARA CRIAR AS TABELAS NO ARRANQUE
+    await create_db_and_tables()
+    print("Tabelas da base de dados verificadas/criadas.")
     print("Aplicação iniciada com sucesso.")
     yield
 
 app = FastAPI(lifespan=lifespan)
 
-# CORREÇÃO: Utilizar o objeto 'router' que foi importado
+# Incluir o router na aplicação principal
 app.include_router(router, prefix="/api/v1")
