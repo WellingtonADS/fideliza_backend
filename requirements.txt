@@ -1,11 +1,11 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
+asyncpg
 pydantic
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
-psycopg2-binary
 fastapi-mail
 qrcode[pil]
