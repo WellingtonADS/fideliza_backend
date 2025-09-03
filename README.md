@@ -6,7 +6,7 @@ Bem-vindo ao repositório do **Fideliza+**, um sistema de fidelização de clien
 
 ## **📋 Visão Geral**
 
-O **Fideliza+** é uma API desenvolvida com o objetivo de gerenciar programas de fidelização de clientes. A aplicação permite que empresas parceiras criem campanhas de pontuação, recompensas e relatórios, enquanto os clientes podem acompanhar seu progresso e resgatar prêmios.
+O **Fideliza+** é uma API desenvolvida para gerenciar programas de fidelização de clientes. A aplicação permite que empresas parceiras criem campanhas de pontuação, recompensas e relatórios, enquanto os clientes podem acompanhar seu progresso e resgatar prêmios.
 
 A API foi projetada com foco em segurança, desempenho e extensibilidade, utilizando as melhores práticas de desenvolvimento.
 
@@ -17,27 +17,43 @@ A API foi projetada com foco em segurança, desempenho e extensibilidade, utiliz
 ### **Gestão de Usuários**
 - Registro e autenticação de clientes, administradores e colaboradores.
 - Suporte a autenticação segura com tokens JWT.
-- Geração de QR Codes para identificação de clientes.
 
 ### **Sistema de Pontuação**
-- Atribuição de pontos a clientes por empresas parceiras.
-- Consulta de saldo de pontos agrupados por empresa.
+- Atribuição e consulta de pontos por empresas parceiras.
 - Histórico de transações de pontos.
 
 ### **Gestão de Recompensas**
 - Criação e listagem de recompensas por empresas.
 - Resgate de recompensas com validação de saldo de pontos.
-- Registro de histórico de recompensas resgatadas.
 
 ### **Relatórios e Métricas**
 - Relatórios resumidos para administradores, incluindo:
   - Total de pontos atribuídos.
   - Total de recompensas resgatadas.
-  - Número de clientes únicos.
 
-### **Experiência do Cliente**
-- Listagem de empresas parceiras.
-- Dashboard com resumo de pontos e últimas atividades.
+---
+
+## **🛠️ Estrutura do Projeto**
+
+A estrutura do projeto está organizada da seguinte forma:
+
+```
+src/
+├── api/
+│   ├── schemas.py          # Definições de schemas (Pydantic)
+│   └── v1/
+│       ├── __init__.py
+│       └── routes.py       # Rotas da API
+├── core/
+│   ├── config.py           # Configurações principais
+│   ├── security.py         # Configurações de segurança (JWT)
+│   └── __init__.py
+├── database/
+│   ├── models.py           # Modelos do banco de dados (SQLAlchemy)
+│   ├── session.py          # Configuração da sessão do banco
+│   └── __init__.py
+└── main.py                 # Ponto de entrada da aplicação
+```
 
 ---
 
@@ -79,35 +95,79 @@ A API foi projetada com foco em segurança, desempenho e extensibilidade, utiliz
    ```
 
 4. **Configure as Variáveis de Ambiente:**
-   - Crie um ficheiro .env na raiz do projeto e preencha as seguintes variáveis:
+   - Crie um arquivo `.env` na raiz do projeto e preencha as variáveis:
      ```env
-     DATABASE_URL="postgresql+asyncpg://seu_usuario:sua_senha@localhost:5432/fideliza_db"
+     DATABASE_URL="postgresql+asyncpg://seu_usuario:sua_senha@:5432/fideliza_db"
      SECRET_KEY="uma_chave_secreta_muito_longa_e_aleatoria_para_os_tokens_jwt"
      ALGORITHM="HS256"
      ACCESS_TOKEN_EXPIRE_MINUTES=30
      ```
 
 5. **Configure a Base de Dados:**
-   - Certifique-se de que a base de dados (ex: fideliza_db) existe no seu PostgreSQL.
-   - Execute o script fideliza_db.sql para criar todas as tabelas e conceder as permissões necessárias ao seu utilizador.
+   - Certifique-se de que a base de dados (ex: `fideliza_db`) existe no PostgreSQL.
+   - Configure as tabelas utilizando os modelos definidos em `database/models.py`.
 
-### **Executar a Aplicação**
+6. **Execute a aplicação:**
+   ```bash
+   uvicorn src.main:app --reload
+   ```
 
-Para iniciar a aplicação, execute o seguinte comando:
-
-```bash
-uvicorn src.main:app --reload
-```
-
-A API estará disponível em [http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-### **Aceder à Documentação Interativa**
-
-Para interagir e testar todos os endpoints, aceda à documentação automática gerada pelo FastAPI:
-
-- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+   A API estará disponível em: [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ---
 
+## **📖 Documentação**
 
-*Este projeto foi desenvolvido com o apoio e a orientação da IA da Google.*
+A documentação interativa da API está disponível automaticamente:
+
+- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **OpenAPI JSON:** [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+
+---
+
+## **🌐 Status de Operação**
+
+O projeto está atualmente em operação na plataforma [Render](https://render.com):
+
+- **Serviço Web:**
+  - URL: [https://fideliza-backend.onrender.com](https://fideliza-backend.onrender.com)
+  - Branch: `main`
+  - Tipo de instância: Gratuita
+
+- **Base de Dados:**
+  - Nome: `fideliza-db`
+  - Status: Disponível
+  - Expiração: 28 de setembro de 2025 (salvo upgrade para instância paga)
+
+---
+
+## **📈 Contribuição**
+
+Contribuições são bem-vindas! Siga os passos abaixo para colaborar:
+
+1. Faça um fork do repositório.
+2. Crie uma nova branch para sua funcionalidade ou correção:
+   ```bash
+   git checkout -b minha-nova-funcionalidade
+   ```
+3. Faça commit das suas alterações:
+   ```bash
+   git commit -m "Adiciona nova funcionalidade"
+   ```
+4. Envie para o repositório remoto:
+   ```bash
+   git push origin minha-nova-funcionalidade
+   ```
+5. Abra um Pull Request.
+
+---
+
+## **🛡️ Licença**
+
+Este projeto está licenciado sob a [Licença MIT](https://opensource.org/licenses/MIT). Sinta-se à vontade para usá-lo e modificá-lo conforme necessário.
+
+---
+
+## **📧 Contato**
+
+Para dúvidas ou suporte, entre em contato pelo e-mail: **wellingtonads@example.com**
