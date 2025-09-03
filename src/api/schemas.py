@@ -90,12 +90,20 @@ class CompanyDetails(CompanyBase):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+# NOVO SCHEMA PARA ATUALIZAÇÃO DA EMPRESA
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    category: Optional[str] = None
+    logo_url: Optional[str] = None
+
 # =============================================================================
 # SCHEMAS DE PONTUAÇÃO E TRANSAÇÕES
 # =============================================================================
 
 class PointAdd(BaseModel):
     client_identifier: str
+    points: int = 1
 
 class PointTransactionResponse(BaseModel):
     """Schema unificado para resposta de transação de pontos."""
@@ -123,6 +131,7 @@ class RewardBase(BaseModel):
 class RewardCreate(RewardBase):
     pass
 
+# NOVO SCHEMA PARA ATUALIZAÇÃO DE PRÉMIO
 class RewardUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -164,3 +173,4 @@ class DashboardData(BaseModel):
     total_points: int
     last_activity: Optional[PointTransactionResponse] = None
     qr_code_base64: Optional[str] = None
+
