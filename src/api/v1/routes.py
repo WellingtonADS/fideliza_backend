@@ -475,6 +475,11 @@ async def update_my_company_details(
     for key, value in update_data.items():
         setattr(company, key, value)
 
+    # Atualiza o nome do usuário na tabela 'users'
+    if "userName" in update_data:
+        current_user.name = update_data["userName"]
+        db.add(current_user)
+
     db.add(company)
     await db.commit()
     await db.refresh(company)
