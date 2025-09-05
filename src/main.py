@@ -19,5 +19,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+@app.get("/")
+def read_root():
+    return {"message": "Bem-vindo à API Fideliza+! Consulte /docs para mais informações."}
+
 # Incluir o router na aplicação principal
 app.include_router(router, prefix="/api/v1")
