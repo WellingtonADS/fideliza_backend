@@ -96,6 +96,7 @@ class CompanyUpdate(BaseModel):
     address: Optional[str] = None
     category: Optional[str] = None
     logo_url: Optional[str] = None
+    userName: Optional[str] = None
 
 # =============================================================================
 # SCHEMAS DE PONTUAÇÃO E TRANSAÇÕES
