@@ -96,27 +96,29 @@ async def request_password_recovery(
         )
 
         if payload.app_type == 'gestao':
-            reset_link = f"fidelizagestao://reset-password?token={password_reset_token}"
+            deep_link = f"fidelizagestao://reset-password?token={password_reset_token}"
+            web_link = f"https://fidelizagestao.com/reset-password?token={password_reset_token}"
         else: # O padrão é 'client'
-            reset_link = f"fidelizacliente://reset-password?token={password_reset_token}"
+            deep_link = f"fidelizacliente://reset-password?token={password_reset_token}"
+            web_link = f"https://fidelizacliente.com/reset-password?token={password_reset_token}"
 
-        # Prepara o e-mail
+        # Prepara o e-mail em HTML com links clicáveis
+        html_body = f"""
+        <p>Olá {user.name},</p>
+        <p>Você solicitou a redefinição da sua senha.</p>
+        <p>Para redefinir sua senha, escolha uma das opções abaixo:</p>
+        <ul>
+            <li>Pelo navegador: <a href='{web_link}' target='_blank'>{web_link}</a></li>
+            <li>Pelo app: <a href='{deep_link}'>{deep_link}</a></li>
+        </ul>
+        <p>Se você não solicitou isto, por favor ignore este e-mail.</p>
+        <p>Obrigado,<br/>Equipa Fideliza+</p>
+        """
         message = MessageSchema(
-            subject="Recuperação de Senha - Fideliza+",
-            recipients=[user.email],
-            body=f"""
-            Olá {user.name},
-
-            Você solicitou a redefinição da sua senha.
-
-            Por favor, use o seguinte link para redefinir a sua senha: {reset_link}
-
-            Se você não solicitou isto, por favor ignore este e-mail.
-
-            Obrigado,
-            Equipa Fideliza+
-            """,
-            subtype=MessageType.plain
+                subject="Recuperação de Senha - Fideliza+",
+                recipients=[user.email],
+                body=html_body,
+                subtype=MessageType.html
         )
 
         # Envia o e-mail em segundo plano
