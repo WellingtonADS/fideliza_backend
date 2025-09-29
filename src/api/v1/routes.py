@@ -96,11 +96,23 @@ async def request_password_recovery(
         )
 
         if payload.app_type == 'gestao':
-            deep_link = f"fidelizagestao://reset-password?token={password_reset_token}"
-            web_link = f"https://fidelizagestao.com/reset-password?token={password_reset_token}"
-        else: # O padrão é 'client'
-            deep_link = f"fidelizacliente://reset-password?token={password_reset_token}"
-            web_link = f"https://fidelizacliente.com/reset-password?token={password_reset_token}"
+            scheme = settings.GESTAO_APP_SCHEME
+            android_pkg = settings.ANDROID_GESTAO_PACKAGE
+            web_base = settings.GESTAO_WEB_RESET_URL
+        else: # 'client'
+            scheme = settings.CLIENT_APP_SCHEME
+            android_pkg = settings.ANDROID_CLIENT_PACKAGE
+            web_base = settings.CLIENT_WEB_RESET_URL
+
+        # Deep link padrão (scheme://path?token=...)
+        deep_link = f"{scheme}://reset-password?token={password_reset_token}"
+        # Intent link Android com fallback para web
+        intent_link = (
+            f"intent://reset-password?token={password_reset_token}#Intent;"
+            f"scheme={scheme};package={android_pkg};end"
+        )
+        # Web fallback (GitHub Pages). Passamos também qual app e open=1 para autoabrir
+        web_link = f"{web_base}?token={password_reset_token}&app={payload.app_type}&open=1"
 
         # Prepara o e-mail em HTML com links clicáveis
         html_body = f"""
@@ -108,8 +120,9 @@ async def request_password_recovery(
         <p>Você solicitou a redefinição da sua senha.</p>
         <p>Para redefinir sua senha, escolha uma das opções abaixo:</p>
         <ul>
-            <li>Pelo navegador: <a href='{web_link}' target='_blank'>{web_link}</a></li>
-            <li>Pelo app: <a href='{deep_link}'>{deep_link}</a></li>
+            <li>Pelo navegador (fallback): <a href='{web_link}' target='_blank'>{web_link}</a></li>
+            <li>Pelo app (scheme): <a href='{deep_link}'>{deep_link}</a></li>
+            <li>Android (intent): <a href='{intent_link}'>{intent_link}</a></li>
         </ul>
         <p>Se você não solicitou isto, por favor ignore este e-mail.</p>
         <p>Obrigado,<br/>Equipa Fideliza+</p>

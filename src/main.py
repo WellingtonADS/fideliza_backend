@@ -1,6 +1,8 @@
+
 # fideliza_backend/src/main.py
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 # Importar o router das rotas da API
 from .api.v1.routes import router
@@ -18,6 +20,14 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://reset.ideiacode.com", "http://localhost:8000", "http://10.0.2.2:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
