@@ -6,12 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import selectinload
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from typing import List
 from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
 from jose import jwt, JWTError
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import PlainTextResponse
 
 from ..schemas import (
     UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
@@ -42,7 +46,16 @@ conf = ConnectionConfig(
     VALIDATE_CERTS = True
 )
 
+# Configuração do rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter()
+
+# Middleware para lidar com rate limiting
+@router.on_event("startup")
+async def startup_event():
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, lambda request, exc: PlainTextResponse("Muitas requisições. Tente novamente mais tarde.", status_code=429))
 
 # =============================================================================
 # 1. ACESSO PÚBLICO E AUTENTICAÇÃO
@@ -148,63 +161,75 @@ async def reset_password(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Redefine a senha do utilizador usando um token de recuperação válido.
+    Permite redefinir a senha de um usuário com base em um token válido.
     """
     try:
-        token_data = jwt.decode(
-            payload.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        # Decodifica e valida o token recebido
+        token_data = jwt.decode(payload.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
-        # Valida se o token foi criado para este propósito
+        # Verifica o propósito do token
         if token_data.get("purpose") != "password-reset":
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido para redefinição de senha",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token inválido para redefinição de senha."
             )
 
-        email: str = token_data.get("sub")
-        if email is None:
+        # Verifica se o token expirou
+        exp = token_data.get("exp")
+        if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token expirado."
             )
 
-    except JWTError:
+        # Verifica se o e-mail no token corresponde a um usuário ativo
+        email = token_data.get("sub")
+        result = await db.execute(select(User).filter(User.email == email))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuário não encontrado."
+            )
+
+        # Atualiza a senha do usuário
+        user.hashed_password = get_password_hash(payload.new_password)
+        db.add(user)
+        await db.commit()
+
+        return {"message": "Senha redefinida com sucesso."}
+
+    except JWTError as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Erro ao validar o token: {str(e)}"
         )
-
-    result = await db.execute(select(User).filter(User.email == email))
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilizador não encontrado",
-        )
-
-    # Atualiza a senha
-    hashed_password = get_password_hash(payload.new_password)
-    user.hashed_password = hashed_password
-    await db.commit()
-
-    return {"message": "Senha redefinida com sucesso."}
 
 # =============================================================================
 # 2. REGISTO DE NOVAS CONTAS
 # =============================================================================
 
 @router.post("/register/client/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Registo"], summary="Regista um novo cliente")
+@limiter.limit("5/minute")
 async def register_client(user: UserCreate, db: AsyncSession = Depends(get_db)):
     """
     Cria um novo utilizador do tipo 'CLIENTE'.
     Verifica se o email já existe antes de criar.
+    Valida a força da senha.
     """
+    # Verifica se o email já está registrado
     result = await db.execute(select(User).filter(User.email == user.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já registado")
-        
+
+    # Valida a força da senha
+    if len(user.password) < 8 or not any(char.isdigit() for char in user.password) or not any(char.isalpha() for char in user.password):
+        raise HTTPException(
+            status_code=400,
+            detail="A senha deve ter pelo menos 8 caracteres, incluindo letras e números."
+        )
+
+    # Cria o novo usuário
     hashed_password = get_password_hash(user.password)
     new_user = User(
         email=user.email, hashed_password=hashed_password, name=user.name, user_type="CLIENT"
@@ -221,6 +246,7 @@ async def register_client(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return new_user
 
 @router.post("/register/company-admin/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED, tags=["Registo"], summary="Regista uma nova empresa e o seu administrador")
+@limiter.limit("5/minute")
 async def register_company_and_admin(
     payload: CompanyAdminCreate, db: AsyncSession = Depends(get_db)
 ):
@@ -230,13 +256,13 @@ async def register_company_and_admin(
     result = await db.execute(select(User).filter(User.email == payload.admin_user.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email de administrador já registado")
-        
+
     # 1. Criar a empresa
     new_company = Company(name=payload.company_name)
     db.add(new_company)
     await db.commit()
     await db.refresh(new_company)
-    
+
     # 2. Criar o utilizador administrador
     hashed_password = get_password_hash(payload.admin_user.password)
     new_admin = User(
@@ -249,12 +275,12 @@ async def register_company_and_admin(
     db.add(new_admin)
     await db.commit()
     await db.refresh(new_admin)
-    
+
     # 3. Associar o admin à empresa (opcional, se o modelo tiver a coluna)
     new_company.admin_user_id = new_admin.id
     await db.commit()
     await db.refresh(new_company)
-    
+
     return new_company
 
 # =============================================================================
@@ -310,6 +336,7 @@ async def get_client_dashboard(
     )
     
 @router.get("/points/my-points", response_model=List[PointsByCompany], tags=["Experiência do Cliente"], summary="Obtém os pontos do cliente por empresa")
+@limiter.limit("10/minute")
 async def get_my_points(
     db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
@@ -335,6 +362,7 @@ async def get_my_points(
     summary="Obtém as transações do cliente para uma empresa específica",
     tags=["Experiência do Cliente"]
 )
+@limiter.limit("10/minute")
 async def get_my_transactions_for_company(
     company_id: int,
     db: AsyncSession = Depends(get_db),
@@ -360,6 +388,7 @@ async def get_my_transactions_for_company(
     return transactions
 
 @router.get("/rewards/my-status", response_model=List[RewardStatusResponse], tags=["Experiência do Cliente"], summary="Verifica o estado das recompensas para o cliente")
+@limiter.limit("10/minute")
 async def get_my_rewards_status(
     db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
@@ -408,6 +437,7 @@ async def get_my_rewards_status(
     return response_data
 
 @router.post("/rewards/redeem", response_model=RedeemedRewardResponse, status_code=status.HTTP_201_CREATED, tags=["Experiência do Cliente"], summary="Resgata uma recompensa")
+@limiter.limit("5/minute")
 async def redeem_reward(
     payload: RewardRedeemRequest,
     db: AsyncSession = Depends(get_db),
@@ -456,10 +486,8 @@ async def redeem_reward(
         points_spent=reward.points_required
     )
     
-    db.add(spend_transaction)
-    db.add(new_redeemed_reward)
+    db.add_all([spend_transaction, new_redeemed_reward])
     await db.commit()
-    await db.refresh(new_redeemed_reward)
     
     return new_redeemed_reward
 
@@ -468,6 +496,7 @@ async def redeem_reward(
 # =============================================================================
 
 @router.get("/companies/me", response_model=CompanyDetails, tags=["Gestão da Empresa"], summary="Obtém detalhes da empresa do admin")
+@limiter.limit("10/minute")
 async def get_my_company_details(current_user: User = Depends(get_current_admin_user), db: AsyncSession = Depends(get_db)):
     """Obtém os detalhes da empresa do administrador logado."""
     company = await db.get(Company, current_user.company_id)
@@ -476,6 +505,7 @@ async def get_my_company_details(current_user: User = Depends(get_current_admin_
     return company
 
 @router.patch("/companies/me", response_model=CompanyDetails, tags=["Gestão da Empresa"], summary="Atualiza detalhes da empresa do admin")
+@limiter.limit("5/minute")
 async def update_my_company_details(
     company_data: CompanyUpdate,
     current_user: User = Depends(get_current_admin_user),
@@ -501,6 +531,7 @@ async def update_my_company_details(
     return company
 
 @router.post("/collaborators/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Gestão da Empresa"], summary="Cria um novo colaborador")
+@limiter.limit("5/minute")
 async def create_collaborator(
     collaborator: CollaboratorCreate,
     db: AsyncSession = Depends(get_db),
@@ -514,11 +545,18 @@ async def create_collaborator(
     result = await db.execute(select(User).filter(User.email == collaborator.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já registado")
-        
+
+    # Valida a força da senha
+    if len(collaborator.password) < 8 or not any(char.isdigit() for char in collaborator.password) or not any(char.isalpha() for char in collaborator.password):
+        raise HTTPException(
+            status_code=400,
+            detail="A senha deve ter pelo menos 8 caracteres, incluindo letras e números."
+        )
+
     company_id = current_admin.company_id
     if not company_id:
         raise HTTPException(status_code=403, detail="Administrador não está associado a nenhuma empresa.")
-        
+
     hashed_password = get_password_hash(collaborator.password)
     new_collaborator = User(
         email=collaborator.email,
@@ -718,6 +756,7 @@ async def delete_reward(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/reports/summary", response_model=CompanyReport, tags=["Gestão da Empresa"], summary="Obtém um relatório resumido da empresa")
+@limiter.limit("5/minute")
 async def get_company_summary_report(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin_user)

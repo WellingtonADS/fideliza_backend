@@ -35,6 +35,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+def validate_jwt_claims(payload: dict):
+    """
+    Valida os claims obrigatórios no payload do JWT.
+    """
+    required_claims = ["sub", "user_type", "company_id", "exp"]
+    for claim in required_claims:
+        if claim not in payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Claim obrigatório ausente: {claim}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,13 +56,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        validate_jwt_claims(payload)  # Valida os claims obrigatórios
+
         email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-        
-        token_data = TokenData(email=email, user_type=payload.get("user_type"), company_id=payload.get("company_id"))
-    except JWTError:
-        raise credentials_exception
+        user_type: str = payload.get("user_type")
+        company_id: str = payload.get("company_id")
+        exp: int = payload.get("exp")
+
+        # Verifica se o token expirou
+        if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expirado",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        token_data = TokenData(email=email, user_type=user_type, company_id=company_id)
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Erro ao decodificar o token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     result = await db.execute(select(User).filter(User.email == token_data.email))
     user = result.scalar_one_or_none()
