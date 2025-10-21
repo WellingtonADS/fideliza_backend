@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -14,13 +15,52 @@ from ..database.session import get_db
 from ..core.config import settings
 
 # Configuração para hashing de senhas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Evita erros com bcrypt no Windows/Python 3.12 durante autodetecção e senhas longas
+# Importante: não incluir "bcrypt" aqui para evitar bugs do backend do passlib no Windows/Python.
+# Usamos verificação direta com a lib "bcrypt" apenas quando detectar hash $2a/$2b/$2y.
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto",
+)
 
 # Configuração para OAuth2 com esquema de token de senha
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/token")
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica a senha contra o hash armazenado.
+
+    - Primeiro tenta pbkdf2_sha256 via passlib (padrão atual);
+    - Se o hash for bcrypt ($2a/$2b/$2y), usa a biblioteca 'bcrypt' diretamente para evitar bugs do passlib;
+    - Em último caso, compara texto puro (migração legada).
+    """
+    # 1) pbkdf2 (padrão)
+    try:
+        if pwd_context.verify(plain_password, hashed_password):
+            return True
+    except UnknownHashError:
+        # seguirá para outras estratégias
+        pass
+    except Exception:
+        # qualquer outra falha, tenta caminhos seguintes
+        pass
+
+    # 2) bcrypt direto, se detectado pelo prefixo
+    try:
+        if hashed_password and hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
+            try:
+                import bcrypt as _bcrypt  # type: ignore
+                return _bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+            except Exception:
+                # se a lib bcrypt não estiver disponível/ok, segue para fallback
+                pass
+    except Exception:
+        pass
+
+    # 3) Fallback: texto puro legado
+    try:
+        return plain_password == hashed_password
+    except Exception:
+        return False
 
 def get_password_hash(password):
     return pwd_context.hash(password)

@@ -1,8 +1,9 @@
 # fideliza_backend/src/core/config.py
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 import os
 
+# Carrega apenas o .env padrão
 load_dotenv()
 
 class Settings(BaseSettings):
@@ -26,12 +27,14 @@ class Settings(BaseSettings):
     ANDROID_CLIENT_PACKAGE: str = os.getenv("ANDROID_CLIENT_PACKAGE", "com.fideliza_cliente")
     ANDROID_GESTAO_PACKAGE: str = os.getenv("ANDROID_GESTAO_PACKAGE", "com.fideliza_gestao")
 
-    # URLs completas para a página web de reset. Por padrão usamos o GitHub Pages.
-    # Ajuste via .env se necessário.
-    CLIENT_WEB_RESET_URL: str = os.getenv("CLIENT_WEB_RESET_URL", "https://reset.ideiacode.com")
-    GESTAO_WEB_RESET_URL: str = os.getenv("GESTAO_WEB_RESET_URL", "https://reset.ideiacode.com")
+    # URLs completas para a página web de reset.
+    # Para ambiente local, por padrão aponte para um frontend local (ex.: React em :3000)
+    CLIENT_WEB_RESET_URL: str = os.getenv("CLIENT_WEB_RESET_URL", "http://localhost:3000")
+    GESTAO_WEB_RESET_URL: str = os.getenv("GESTAO_WEB_RESET_URL", "http://localhost:3000")
 
-    class Config:
-        env_file = ".env"
+    model_config = {
+        'env_file': '.env',
+        'extra': 'ignore'
+    }
 
 settings = Settings()

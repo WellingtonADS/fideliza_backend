@@ -1,10 +1,10 @@
-# **Fideliza+ API (Backend)**
+# Fideliza+ API (Backend)
 
 Bem-vindo ao repositório do **Fideliza+**, um sistema de fidelização de clientes desenvolvido com tecnologias modernas para oferecer uma solução robusta e escalável. Este backend fornece suporte completo para as funcionalidades de gestão de clientes, empresas, colaboradores, pontuação e recompensas.
 
 ---
 
-## **📋 Visão Geral**
+## 📋 Visão Geral
 
 O **Fideliza+** é uma API desenvolvida para gerenciar programas de fidelização de clientes. A aplicação permite que empresas parceiras criem campanhas de pontuação, recompensas e relatórios, enquanto os clientes podem acompanhar seu progresso e resgatar prêmios.
 
@@ -12,7 +12,7 @@ A API foi projetada com foco em segurança, desempenho e extensibilidade, utiliz
 
 ---
 
-## **🚀 Funcionalidades**
+## 🚀 Funcionalidades
 
 ### **Gestão de Usuários**
 - Registro e autenticação de clientes, administradores e colaboradores.
@@ -33,7 +33,7 @@ A API foi projetada com foco em segurança, desempenho e extensibilidade, utiliz
 
 ---
 
-## **🛠️ Estrutura do Projeto**
+## 🛠️ Estrutura do Projeto
 
 A estrutura do projeto está organizada da seguinte forma:
 
@@ -57,7 +57,7 @@ src/
 
 ---
 
-## **🛠️ Tecnologias Utilizadas**
+## 🛠️ Tecnologias Utilizadas
 
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
 - **Base de Dados:** [PostgreSQL](https://www.postgresql.org/)
@@ -68,36 +68,35 @@ src/
 
 ---
 
-## **📦 Configuração e Execução**
+## 📦 Configuração e Execução (100% local)
 
-### **Pré-requisitos**
+### Pré-requisitos
 - Python 3.10+
-- PostgreSQL configurado localmente ou em um container Docker.
+- PostgreSQL local (sem Docker)
 
-### **Passos para Configuração**
+### Passos para Configuração (Windows PowerShell)
 
 1. **Clone o repositório:**
-   ```bash
+   ```pwsh
    git clone https://github.com/wellingtonads/fideliza_backend.git
    cd fideliza_backend
    ```
 
 2. **Crie e ative um ambiente virtual:**
-   ```bash
-   # Windows
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
+   ```pwsh
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
    ```
 
 3. **Instale as dependências:**
-   ```bash
+   ```pwsh
    pip install -r requirements.txt
    ```
 
 4. **Configure as Variáveis de Ambiente:**
    - Crie um arquivo `.env` na raiz do projeto e preencha as variáveis:
      ```env
-     DATABASE_URL="postgresql+asyncpg://seu_usuario:sua_senha@:5432/fideliza_db"
+   DATABASE_URL="postgresql+asyncpg://seu_usuario:sua_senha@localhost:5432/fideliza_db"
      SECRET_KEY="uma_chave_secreta_muito_longa_e_aleatoria_para_os_tokens_jwt"
      ALGORITHM="HS256"
      ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -108,40 +107,36 @@ src/
    - Configure as tabelas utilizando os modelos definidos em `database/models.py`.
 
 6. **Execute a aplicação:**
-   ```bash
+   ```pwsh
    uvicorn src.main:app --reload
    ```
 
-   A API estará disponível em: [http://127.0.0.1:8000](http://127.0.0.1:8000).
+   A API estará disponível em: http://127.0.0.1:8000
 
 ---
 
-## **📖 Documentação**
+## 📖 Documentação
 
 A documentação interativa da API está disponível automaticamente:
 
-- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **OpenAPI JSON:** [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+- Swagger UI: http://127.0.0.1:8000/api/v1/docs
+- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
 
 ---
 
-## **🌐 Status de Operação**
+## 🔐 Autenticação e Recuperação de Senha
 
-O projeto está atualmente em operação na plataforma [Render](https://render.com):
+- Login: `POST /api/v1/token` (Form URL Encoded: `username`, `password`)
+- Recuperar senha: `POST /api/v1/request-password-recovery` (gera link com deep link e web link)
+- Redefinir senha: `POST /api/v1/reset-password` (body: `{ token, new_password }`)
 
-- **Serviço Web:**
-  - URL: [https://fideliza-backend.onrender.com](https://fideliza-backend.onrender.com)
-  - Branch: `main`
-  - Tipo de instância: Gratuita
-
-- **Base de Dados:**
-  - Nome: `fideliza-db`
-  - Status: Disponível
-  - Expiração: 28 de setembro de 2025 (salvo upgrade para instância paga)
+Observações:
+- JWT inclui claims: `sub`, `user_type`, `company_id`.
+- Tokens de recuperação expiram em 15 minutos (`purpose=password-reset`).
 
 ---
 
-## **📈 Contribuição**
+## 📈 Contribuição
 
 Contribuições são bem-vindas! Siga os passos abaixo para colaborar:
 
@@ -162,12 +157,12 @@ Contribuições são bem-vindas! Siga os passos abaixo para colaborar:
 
 ---
 
-## **🛡️ Licença**
+## 🛡️ Licença
 
 Este projeto está licenciado sob a [Licença MIT](https://opensource.org/licenses/MIT). Sinta-se à vontade para usá-lo e modificá-lo conforme necessário.
 
 ---
 
-## **📧 Contato**
+## 📧 Contato
 
 Para dúvidas ou suporte, entre em contato pelo e-mail: **wellingtonads@example.com**

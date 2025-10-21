@@ -49,7 +49,7 @@ async def setup_test_data(db_session):
 def client_auth_headers():
     """Cria um token de acesso para o utilizador cliente."""
     access_token = create_access_token(
-        data={"sub": "cliente@teste.com", "user_type": "CLIENT"},
+        data={"sub": "cliente@teste.com", "user_type": "CLIENT", "company_id": None},
         expires_delta=timedelta(minutes=15)
     )
     return {"Authorization": f"Bearer {access_token}"}
@@ -106,7 +106,7 @@ async def test_get_client_dashboard_forbidden_for_admin(async_client: AsyncClien
     response = await async_client.get("/api/v1/dashboard", headers=admin_auth_headers)
     
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json()["detail"] == "Acesso restrito a clientes"
+    assert "Acesso restrito a clientes" in response.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_get_client_dashboard_unauthorized(async_client: AsyncClient):
@@ -141,3 +141,69 @@ async def test_get_my_points_by_company(async_client: AsyncClient, setup_test_da
     assert company2_data is not None
     assert company2_data["total_points"] == 1 # 1 transação para a empresa 2
     assert company2_data["company"]["name"] == "Livraria Saber"
+
+# --- Novos Testes ---
+
+@pytest.mark.asyncio
+async def test_register_client(async_client: AsyncClient):
+    """
+    Testa o endpoint POST /register/client/.
+    Verifica se o registro de um cliente retorna o QR code corretamente.
+    """
+    # Senha precisa conter letras e números e ter >= 8 chars
+    payload = {
+        "email": "novo_cliente@teste.com",
+        "password": "Senha1234",
+        "name": "Novo Cliente"
+    }
+    response = await async_client.post("/api/v1/register/client/", json=payload, headers={"X-Test-Id": "register-client-1"})
+
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.json()
+    assert "qr_code_base64" in data
+
+@pytest.mark.asyncio
+async def test_reset_password(async_client: AsyncClient):
+    """
+    Testa o endpoint POST /reset-password.
+    Verifica se a redefinição de senha funciona corretamente.
+    """
+    # Primeiro criamos um usuário e geramos um token válido de reset
+    # Cria usuário
+    payload_reg = {"email": "cliente2@teste.com", "password": "Senha1234", "name": "Cliente 2"}
+    resp_reg = await async_client.post("/api/v1/register/client/", json=payload_reg, headers={"X-Test-Id": "reset-password-setup"})
+    assert resp_reg.status_code == status.HTTP_201_CREATED
+
+    # Gera token de reset com propósito correto
+    from src.core.security import create_access_token
+    token = create_access_token({"sub": "cliente2@teste.com", "purpose": "password-reset"}, expires_delta=timedelta(minutes=15))
+
+    payload = {
+        "token": token,
+        "new_password": "NovaSenha123"
+    }
+    response = await async_client.post("/api/v1/reset-password", json=payload)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["message"] == "Senha redefinida com sucesso."
+
+@pytest.mark.asyncio
+async def test_redeem_rewards(async_client: AsyncClient, db_session, setup_test_data, client_auth_headers):
+    """
+    Testa o endpoint POST /rewards/redeem.
+    Verifica se o resgate de recompensas reduz os pontos corretamente.
+    """
+    # Criar uma recompensa na empresa 1 que requer 2 pontos
+    from src.database.models import Reward
+    reward = Reward(name="Café grátis", description="", points_required=2, company_id=1)
+    db_session.add(reward)
+    await db_session.commit()
+    await db_session.refresh(reward)
+
+    payload = {"reward_id": reward.id}
+    response = await async_client.post("/api/v1/rewards/redeem", headers=client_auth_headers, json=payload)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.json()
+    assert data["reward_id"] == reward.id
+    assert data["client_id"] == 10

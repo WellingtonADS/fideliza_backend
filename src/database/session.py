@@ -1,6 +1,5 @@
 # fideliza_backend/src/database/session.py
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 from typing import AsyncGenerator
 
 # CORREÇÃO: Alterar a importação para ser relativa
@@ -10,10 +9,9 @@ DATABASE_URL = str(settings.DATABASE_URL)
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 AsyncSessionFactory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-Base = declarative_base()
 
-# Adicione esta importação para garantir que os modelos sejam registados com a Base acima
-from ..database import models
+# Use a mesma Base declarativa definida em models.py para evitar divergências
+from ..database.models import Base  # garante que todos os modelos sejam importados
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionFactory() as session:

@@ -7,6 +7,7 @@ __pycache__/
 .env
 .env.*
 *.env
+.env.local
 
 # Pastas de ambientes virtuais
 venv/
@@ -22,6 +23,7 @@ env.bak/
 *.log
 *.db
 *.sqlite3
+*.sql
 
 # Ficheiros de configuração do editor/IDE
 .vscode/
