@@ -1,6 +1,18 @@
+"""
+# Segurança e Autenticação
+
+Implementa hashing de senhas, geração/validação de JWT e dependências de
+autorização usadas nas rotas (FastAPI).
+
+## Conteúdo
+- Hash de senhas (passlib) com fallback seguro para bcrypt legado
+- Criação de token JWT (claims mínimos: sub, user_type, company_id, exp)
+- Dependências de segurança (`get_current_user`, `get_current_admin_user`, etc.)
+"""
+
 # fideliza_backend/src/core/security.py
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Any, Dict, cast
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
 from jose import JWTError, jwt
@@ -62,10 +74,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
+    """Gera o hash da senha usando o contexto configurado."""
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Cria um token JWT com expiração opcional.
+
+    Args:
+        data: Claims a codificar no token (ex.: sub, user_type, company_id).
+        expires_delta: Delta de tempo para expiração. Default 15 minutos.
+
+    Returns:
+        Token JWT assinado (string).
+    """
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -75,7 +97,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-def validate_jwt_claims(payload: dict):
+def validate_jwt_claims(payload: Dict[str, Any]):
     """
     Valida os claims obrigatórios no payload do JWT.
     """
@@ -98,10 +120,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         validate_jwt_claims(payload)  # Valida os claims obrigatórios
 
-        email: str = payload.get("sub")
-        user_type: str = payload.get("user_type")
-        company_id: str = payload.get("company_id")
-        exp: int = payload.get("exp")
+        email: str = cast(str, payload.get("sub"))
+        user_type: str = cast(str, payload.get("user_type"))
+        company_id: Optional[int] = cast(Optional[int], payload.get("company_id"))
+        exp: int = cast(int, payload.get("exp"))
 
         # Verifica se o token expirou
         if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):

@@ -1,0 +1,31 @@
+site_name: Fideliza+ Backend
+site_description: Documentação da API e do código do backend Fideliza+
+# Opcional: defina a URL do repositório se aplicável
+# repo_url: https://github.com/wellingtonads/fideliza_backend
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          setup_commands:
+            - import sys
+            - sys.path.append('src')
+          options:
+            # Ajuste de estilo de docstring conforme preferência ("google", "numpy" ou "sphinx")
+            docstring_style: google
+            show_source: true
+            merge_init_into_class: true
+            docstring_section_style: table
+
+nav:
+  - Início: index.md
+  - Referência:
+      - Schemas (Pydantic): reference/api/schemas.md
+      - Rotas (FastAPI): reference/api/v1/routes.md
+      - Segurança (JWT): reference/core/security.md
+      - Modelos (SQLAlchemy): reference/database/models.md

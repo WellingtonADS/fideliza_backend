@@ -4,6 +4,23 @@ Bem-vindo ao repositório do **Fideliza+**, um sistema de fidelização de clien
 
 ---
 
+## 🧰 Estilo de código e lint
+
+Este projeto inclui configuração para formatação e lint conforme as melhores práticas:
+
+- black (formatação automática)
+- ruff (lint e ordenação de imports)
+
+Para usar localmente (no mesmo venv):
+
+```pwsh
+pip install -r requirements.txt
+ruff check src
+black src
+```
+
+---
+
 ## 📋 Visão Geral
 
 O **Fideliza+** é uma API desenvolvida para gerenciar programas de fidelização de clientes. A aplicação permite que empresas parceiras criem campanhas de pontuação, recompensas e relatórios, enquanto os clientes podem acompanhar seu progresso e resgatar prêmios.
@@ -121,6 +138,19 @@ A documentação interativa da API está disponível automaticamente:
 
 - Swagger UI: http://127.0.0.1:8000/api/v1/docs
 - OpenAPI JSON: http://127.0.0.1:8000/openapi.json
+
+### Documentação do código (MkDocs + mkdocstrings)
+
+Além do Swagger, este repositório inclui um site de documentação do código fonte gerado com **MkDocs** e **mkdocstrings**.
+
+- Configuração: arquivo `mkdocs.yml` na raiz do backend.
+- Páginas: pasta `docs/` (inclui referência automática para `src.api.schemas`, `src.api.v1.routes`, `src.core.security` e `src.database.models`).
+- Dependências opcionais de docs: `requirements-docs.txt`.
+
+Como rodar localmente (opcional):
+1. Instale as dependências (já incluídas em `requirements.txt`): `pip install -r requirements.txt`
+2. Inicie o servidor de documentação: `mkdocs serve`
+3. Acesse em: `http://127.0.0.1:8000` (ou a porta exibida pelo MkDocs)
 
 ---
 

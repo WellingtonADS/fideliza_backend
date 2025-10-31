@@ -12,3 +12,13 @@ fastapi-mail==1.4.1
 qrcode[pil]==7.4.2
 python-multipart==0.0.6
 slowapi==0.1.9
+
+# Dev tools for code style and linting
+black==24.8.0
+ruff==0.6.9
+
+# Documentation tooling
+mkdocs>=1.6
+mkdocs-material>=9.5
+mkdocstrings[python]>=0.25
+griffe>=0.44

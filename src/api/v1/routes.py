@@ -1,35 +1,69 @@
 # -*- coding: utf-8 -*-
+"""
+# API v1 — Rotas principais
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+Este módulo implementa as rotas HTTP da API v1 com FastAPI.
+
+## Seções
+- 1. Acesso público e autenticação
+- 2. Registo (admin/cliente)
+- 3. Experiência do cliente (dashboard, pontos, transações, recompensas)
+- 4. Gestão da empresa (admins e colaboradores)
+- 5. Perfil do utilizador
+
+As respostas utilizam modelos Pydantic e as consultas usam SQLAlchemy assíncrono.
+Inclui ainda proteção de rate limit usando SlowAPI.
+"""
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, List, Optional, ParamSpec, TypeVar, cast
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func, distinct
-from sqlalchemy.orm import selectinload
-from datetime import timedelta, datetime, timezone
-from typing import List
-from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
-from pydantic import EmailStr
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import case, distinct, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
-from ..schemas import (
-    UserCreate, UserResponse, Token, CompanyResponse, TokenData, 
-    CollaboratorCreate, CompanyAdminCreate, PointAdd, PointTransactionResponse,
-    PointsByCompany, RewardCreate, RewardResponse, RewardStatusResponse,
-    RewardRedeemRequest, RedeemedRewardResponse, CompanyReport, UserUpdate,
-    CompanyDetails, DashboardData, PasswordRecoveryRequest, PasswordReset, CompanyUpdate, RewardUpdate 
-)
-from ...database.models import User, Company, PointTransaction, Reward, RedeemedReward
-from ...database.session import get_db
-from ...core.security import (
-    verify_password, get_password_hash, create_access_token,
-    get_current_active_user, get_current_admin_user,
-    get_current_collaborator_or_admin
-)
 from ...core.config import settings
+from ...core.security import (
+    create_access_token,
+    get_current_active_user,
+    get_current_admin_user,
+    get_current_collaborator_or_admin,
+    get_password_hash,
+    verify_password,
+)
+from ...database.models import Company, PointTransaction, RedeemedReward, Reward, User
+from ...database.session import get_db
+from ..schemas import (
+    CollaboratorCreate,
+    CompanyAdminCreate,
+    CompanyDetails,
+    CompanyReport,
+    CompanyResponse,
+    CompanyUpdate,
+    DashboardData,
+    PasswordRecoveryRequest,
+    PasswordReset,
+    PointAdd,
+    PointsByCompany,
+    PointTransactionResponse,
+    RedeemedRewardResponse,
+    RewardCreate,
+    RewardRedeemRequest,
+    RewardResponse,
+    RewardStatusResponse,
+    RewardUpdate,
+    Token,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 
 # Configuração do FastMail
 conf = ConnectionConfig(
@@ -45,20 +79,30 @@ conf = ConnectionConfig(
 )
 
 # Configuração do rate limiter com key_func sensível a testes
-def _key_func(request):
-    # Se um header de teste existir, usa-o como chave de rate limit para isolar casos de teste
-    test_id = request.headers.get("X-Test-Id") if request and hasattr(request, 'headers') else None
-    if test_id:
-        return test_id
-    return get_remote_address(request)
+def _key_func(request: Request) -> str:
+    """Determina a chave para rate limit a partir do IP ou de um header de teste.
 
-limiter = Limiter(key_func=_key_func)
+    Se o header "X-Test-Id" estiver presente, usa-o para isolar casos de teste.
+    Caso contrário, retorna o endereço remoto.
+    """
+    test_id: Optional[str] = request.headers.get("X-Test-Id")
+    return test_id or get_remote_address(request)
+
+limiter = cast(Any, Limiter(key_func=_key_func))  # pyright: ignore[reportUnknownMemberType]
+
+# Decorador com tipagem explícita para o rate limiter (evita avisos do type checker)
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def typed_limit(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    raw_deco = cast(Callable[[Callable[P, R]], Callable[P, R]], limiter.limit(*args, **kwargs))
+    def _apply(func: Callable[P, R]) -> Callable[P, R]:
+        return raw_deco(func)
+    return _apply
 
 router = APIRouter()
 
-# =============================================================================
 # 1. ACESSO PÚBLICO E AUTENTICAÇÃO
-# =============================================================================
 
 @router.get("/", tags=["Status"], summary="Verifica o estado da API")
 def read_root():
@@ -184,6 +228,11 @@ async def reset_password(
 
         # Verifica se o token expirou
         exp = token_data.get("exp")
+        if not isinstance(exp, (int, float)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token inválido: claim 'exp' ausente ou inválida."
+            )
         if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -211,14 +260,12 @@ async def reset_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro ao validar o token: {str(e)}"
-        )
+        ) from e
 
-# =============================================================================
 # 2. REGISTO DE NOVAS CONTAS
-# =============================================================================
 
 @router.post("/register/client/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Registo"], summary="Regista um novo cliente")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def register_client(request: Request, user: UserCreate, db: AsyncSession = Depends(get_db)):
     """
     Cria um novo utilizador do tipo 'CLIENTE'.
@@ -254,7 +301,7 @@ async def register_client(request: Request, user: UserCreate, db: AsyncSession =
     return new_user
 
 @router.post("/register/company-admin/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED, tags=["Registo"], summary="Regista uma nova empresa e o seu administrador")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def register_company_and_admin(
     request: Request,
     payload: CompanyAdminCreate, db: AsyncSession = Depends(get_db)
@@ -292,9 +339,7 @@ async def register_company_and_admin(
 
     return new_company
 
-# =============================================================================
 # 3. EXPERIÊNCIA DO CLIENTE
-# =============================================================================
 
 @router.get("/companies", response_model=List[CompanyDetails], tags=["Experiência do Cliente"], summary="Lista todas as empresas parceiras")
 async def get_all_companies(db: AsyncSession = Depends(get_db)):
@@ -344,14 +389,19 @@ async def get_client_dashboard(
     last_transaction_result = await db.execute(last_transaction_query)
     last_transaction = last_transaction_result.scalar_one_or_none()
 
+    last_activity_schema = (
+        PointTransactionResponse.model_validate(last_transaction)
+        if last_transaction else None
+    )
+
     return DashboardData(
         total_points=total_points,
-        last_activity=last_transaction,
+        last_activity=last_activity_schema,
         qr_code_base64=current_user.qr_code_base64
     )
     
 @router.get("/points/my-points", response_model=List[PointsByCompany], tags=["Experiência do Cliente"], summary="Obtém os pontos do cliente por empresa")
-@limiter.limit("10/minute")
+@typed_limit("10/minute")
 async def get_my_points(
     request: Request,
     db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)
@@ -384,7 +434,7 @@ async def get_my_points(
     summary="Obtém as transações do cliente para uma empresa específica",
     tags=["Experiência do Cliente"]
 )
-@limiter.limit("10/minute")
+@typed_limit("10/minute")
 async def get_my_transactions_for_company(
     request: Request,
     company_id: int,
@@ -417,7 +467,7 @@ async def get_my_transactions_for_company(
     return transactions
 
 @router.get("/rewards/my-status", response_model=List[RewardStatusResponse], tags=["Experiência do Cliente"], summary="Verifica o estado das recompensas para o cliente")
-@limiter.limit("10/minute")
+@typed_limit("10/minute")
 async def get_my_rewards_status(
     request: Request,
     db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user)
@@ -444,8 +494,9 @@ async def get_my_rewards_status(
     points_result = await db.execute(points_query)
     client_points_map = {company_id: total for company_id, total in points_result.all()}
 
+    response_data: List[RewardStatusResponse] = []
     if not client_points_map:
-        return []
+        return response_data
 
     # 2. Obter todas as recompensas das empresas relevantes
     rewards_query = select(Reward).filter(Reward.company_id.in_(list(client_points_map.keys())))
@@ -453,7 +504,6 @@ async def get_my_rewards_status(
     all_rewards = rewards_result.scalars().all()
     
     # 3. Calcular o estado de cada recompensa
-    response_data = []
     for reward in all_rewards:
         client_points_in_company = client_points_map.get(reward.company_id, 0)
         points_needed = reward.points_required - client_points_in_company
@@ -473,7 +523,7 @@ async def get_my_rewards_status(
     return response_data
 
 @router.post("/rewards/redeem", response_model=RedeemedRewardResponse, status_code=status.HTTP_201_CREATED, tags=["Experiência do Cliente"], summary="Resgata uma recompensa")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def redeem_reward(
     request: Request,
     payload: RewardRedeemRequest,
@@ -534,12 +584,10 @@ async def redeem_reward(
     
     return new_redeemed_reward
 
-# =============================================================================
 # 4. GESTÃO DA EMPRESA (ADMINS E COLABORADORES)
-# =============================================================================
 
 @router.get("/companies/me", response_model=CompanyDetails, tags=["Gestão da Empresa"], summary="Obtém detalhes da empresa do admin")
-@limiter.limit("10/minute")
+@typed_limit("10/minute")
 async def get_my_company_details(request: Request, current_user: User = Depends(get_current_admin_user), db: AsyncSession = Depends(get_db)):
     """Obtém os detalhes da empresa do administrador logado."""
     company = await db.get(Company, current_user.company_id)
@@ -548,7 +596,7 @@ async def get_my_company_details(request: Request, current_user: User = Depends(
     return company
 
 @router.patch("/companies/me", response_model=CompanyDetails, tags=["Gestão da Empresa"], summary="Atualiza detalhes da empresa do admin")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def update_my_company_details(
     request: Request,
     company_data: CompanyUpdate,
@@ -575,7 +623,7 @@ async def update_my_company_details(
     return company
 
 @router.post("/collaborators/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Gestão da Empresa"], summary="Cria um novo colaborador")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def create_collaborator(
     request: Request,
     collaborator: CollaboratorCreate,
@@ -801,7 +849,7 @@ async def delete_reward(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/reports/summary", response_model=CompanyReport, tags=["Gestão da Empresa"], summary="Obtém um relatório resumido da empresa")
-@limiter.limit("5/minute")
+@typed_limit("5/minute")
 async def get_company_summary_report(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -822,7 +870,10 @@ async def get_company_summary_report(
     # Otimização: Consulta única para buscar todos os dados do relatório.
     report_query = (
         select(
-            func.coalesce(func.sum(PointTransaction.points).filter(PointTransaction.points > 0), 0),
+            func.coalesce(
+                func.sum(case((PointTransaction.points > 0, PointTransaction.points), else_=0)),
+                0
+            ),
             func.coalesce(func.count(distinct(PointTransaction.client_id)), 0),
             func.coalesce(func.count(RedeemedReward.id), 0)
         )
@@ -840,9 +891,7 @@ async def get_company_summary_report(
         unique_customers=unique_customers
     )
     
-# =============================================================================
 # 5. PERFIL DE UTILIZADOR (COMUM A TODOS)
-# =============================================================================
 
 @router.get("/users/me", response_model=UserResponse, tags=["Perfil do Utilizador"], summary="Obtém detalhes do utilizador logado")
 async def get_current_user_details(current_user: User = Depends(get_current_active_user)):

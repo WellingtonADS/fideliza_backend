@@ -1,40 +1,123 @@
-# fideliza_backend/src/core/config.py
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
-import os
+# src/core/config.py
+"""
+# Configuração da aplicação (Pydantic Settings)
 
-# Carrega apenas o .env padrão
-load_dotenv()
+Centraliza as configurações do backend (BD, JWT, e-mail, deep links e URLs de reset web)
+usando Pydantic Settings. Valores vêm de variáveis de ambiente e um arquivo `.env` (opcional),
+com defaults seguros para desenvolvimento local.
+
+## Principais variáveis
+- `DATABASE_URL`: URL assíncrona da base de dados (postgresql+asyncpg ou sqlite+aiosqlite).
+- `SECRET_KEY`: Chave secreta do JWT.
+- `ALGORITHM`: Algoritmo do JWT (ex.: HS256).
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: Expiração do token em minutos.
+- `MAIL_*`: Configuração de SMTP (username, password, from, server/port, TLS).
+- `CLIENT_APP_SCHEME`/`GESTAO_APP_SCHEME`: Esquemas de deep link dos apps.
+- `CLIENT_WEB_RESET_URL`/`GESTAO_WEB_RESET_URL`: URLs base para reset de senha via web.
+
+## Validação
+- `DATABASE_URL` aceita apenas `postgresql+asyncpg://` ou `sqlite+aiosqlite://` (vazio/None permitido).
+- `SECRET_KEY` e `ALGORITHM` não podem ser vazios.
+- URLs de reset devem iniciar com `http://` ou `https://`.
+"""
+
+from functools import lru_cache
+from typing import Optional
+
+from pydantic import Field, field_validator, EmailStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
-    ALGORITHM: str = os.getenv("ALGORITHM")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-    MAIL_USERNAME: str = os.getenv("MAIL_USERNAME")
-    MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD")
-    MAIL_FROM: str = os.getenv("MAIL_FROM")
-    MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
-    MAIL_SERVER: str = os.getenv("MAIL_SERVER")
-    MAIL_STARTTLS: bool = os.getenv("MAIL_STARTTLS", "true").lower() == "true"
-    MAIL_SSL_TLS: bool = os.getenv("MAIL_SSL_TLS", "false").lower() == "true"
+    # Base de dados — aceitar async Postgres por padrão; permitir sqlite+aiosqlite em testes/dev
+    DATABASE_URL: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL de conexão da BD. Recomendado 'postgresql+asyncpg://...'. "
+            "Em testes/local pode usar 'sqlite+aiosqlite:///./dev.db'."
+        ),
+    )
 
-    # Deep link e Web reset configuráveis
-    CLIENT_APP_SCHEME: str = os.getenv("CLIENT_APP_SCHEME", "fidelizacliente")
-    GESTAO_APP_SCHEME: str = os.getenv("GESTAO_APP_SCHEME", "fidelizagestao")
+    # JWT
+    SECRET_KEY: str = Field(
+        default="dev-secret-key", description="Chave secreta do JWT"
+    )
+    ALGORITHM: str = Field(
+        default="HS256", description="Algoritmo de assinatura do JWT"
+    )
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=30, ge=1, description="Expiração do token (min)"
+    )
 
-    ANDROID_CLIENT_PACKAGE: str = os.getenv("ANDROID_CLIENT_PACKAGE", "com.fideliza_cliente")
-    ANDROID_GESTAO_PACKAGE: str = os.getenv("ANDROID_GESTAO_PACKAGE", "com.fideliza_gestao")
+    # E-mail
+    # Para evitar erros de tipo em pontos de uso (ex.: ConnectionConfig),
+    # fornecemos defaults não-opcionais onde aplicável.
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: EmailStr = Field(default="no-reply@example.com")
+    MAIL_PORT: int = Field(default=587, ge=1)
+    MAIL_SERVER: str = ""
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
 
-    # URLs completas para a página web de reset.
-    # Para ambiente local, por padrão aponte para um frontend local (ex.: React em :3000)
-    CLIENT_WEB_RESET_URL: str = os.getenv("CLIENT_WEB_RESET_URL", "http://localhost:3000")
-    GESTAO_WEB_RESET_URL: str = os.getenv("GESTAO_WEB_RESET_URL", "http://localhost:3000")
+    # Deep link / Apps
+    CLIENT_APP_SCHEME: str = Field(default="fidelizacliente")
+    GESTAO_APP_SCHEME: str = Field(default="fidelizagestao")
+    ANDROID_CLIENT_PACKAGE: str = Field(default="com.fideliza_cliente")
+    ANDROID_GESTAO_PACKAGE: str = Field(default="com.fideliza_gestao")
 
-    model_config = {
-        'env_file': '.env',
-        'extra': 'ignore'
-    }
+    # URLs Web reset (mantidas como str e validadas por prefixo http/https)
+    CLIENT_WEB_RESET_URL: str = Field(default="http://localhost:3000")
+    GESTAO_WEB_RESET_URL: str = Field(default="http://localhost:3000")
 
-settings = Settings()
+    # Configurações do Pydantic Settings
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # =============================
+    # Validadores
+    # =============================
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        allowed_prefixes = ("postgresql+asyncpg://", "sqlite+aiosqlite://")
+        if not v.startswith(allowed_prefixes):
+            raise ValueError(
+                "DATABASE_URL deve usar 'postgresql+asyncpg://' (produção) ou 'sqlite+aiosqlite://' (dev/teste)."
+            )
+        return v
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if not v or v.strip() == "":
+            raise ValueError("SECRET_KEY não pode ser vazio")
+        return v
+
+    @field_validator("ALGORITHM")
+    @classmethod
+    def validate_algorithm(cls, v: str) -> str:
+        if not v or v.strip() == "":
+            raise ValueError("ALGORITHM não pode ser vazio")
+        return v
+
+    @field_validator("CLIENT_WEB_RESET_URL", "GESTAO_WEB_RESET_URL")
+    @classmethod
+    def validate_reset_urls(cls, v: str) -> str:
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URLs de reset devem começar com http:// ou https://")
+        return v
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    # Instância única de Settings durante o ciclo de vida do processo
+    return Settings()
+
+
+# Mantém compatibilidade com importações existentes: from ..core.config import settings
+settings = get_settings()
