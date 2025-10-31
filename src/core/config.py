@@ -24,7 +24,7 @@ com defaults seguros para desenvolvimento local.
 from functools import lru_cache
 from typing import Optional
 
-from pydantic import Field, field_validator, EmailStr
+from pydantic import EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

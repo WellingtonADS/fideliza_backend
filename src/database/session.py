@@ -1,23 +1,49 @@
-# fideliza_backend/src/database/session.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from typing import AsyncGenerator
+"""Sessão e engine do banco de dados (assíncronos).
 
-# CORREÇÃO: Alterar a importação para ser relativa
-from ..core.config import settings 
+Cria a engine e a fábrica de sessões de forma preguiçosa (lazy),
+evitando falhas em ambientes de teste onde a variável DATABASE_URL
+não está definida. Em ausência de DATABASE_URL, usa-se um SQLite local
+(`sqlite+aiosqlite:///./dev.db`) apenas para desenvolvimento/testes.
+"""
 
-DATABASE_URL = str(settings.DATABASE_URL)
+from typing import AsyncGenerator, Optional
 
-engine = create_async_engine(DATABASE_URL, echo=True)
-AsyncSessionFactory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-# Use a mesma Base declarativa definida em models.py para evitar divergências
-from ..database.models import Base  # garante que todos os modelos sejam importados
+from ..core.config import settings
+from ..database.models import Base
+
+_engine: Optional[AsyncEngine] = None
+_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+
+
+def _ensure_engine() -> None:
+    """Garante que a engine e a session factory existam."""
+    global _engine, _session_factory
+    if _engine is not None and _session_factory is not None:
+        return
+
+    database_url = settings.DATABASE_URL or "sqlite+aiosqlite:///./dev.db"
+    _engine = create_async_engine(database_url, echo=True)
+    _session_factory = async_sessionmaker(
+        _engine, expire_on_commit=False, class_=AsyncSession
+    )
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionFactory() as session:
+    _ensure_engine()
+    assert _session_factory is not None
+    async with _session_factory() as session:
         yield session
 
+
 async def create_db_and_tables():
-    async with engine.begin() as conn:
-        # Esta função agora irá encontrar as tabelas importadas de models.py
+    _ensure_engine()
+    assert _engine is not None
+    async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -132,6 +132,39 @@ src/
 
 ---
 
+## ☁️ Deploy no Render (via GitHub)
+
+Este repositório já inclui um arquivo `render.yaml` para provisionamento automático no Render usando integração com o GitHub.
+
+### Passos
+
+1. Faça login no [Render](https://render.com/) e conecte sua conta do GitHub.
+2. Em New > Blueprint, selecione este repositório (contém `render.yaml`).
+3. Revise as configurações sugeridas e crie o blueprint.
+   - Um serviço Web (FastAPI) será criado com:
+     - Build: `pip install -r requirements.txt`
+     - Start: `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
+     - Health check: `/`
+   - Um banco Postgres (free) será criado e ligado via `DATABASE_URL`.
+4. Habilite Auto-Deploy na branch `main` (ou a de sua preferência).
+
+### Variáveis de ambiente importantes
+
+- DATABASE_URL: fornecida automaticamente pelo serviço Postgres do Render (ex.: `postgres://...`). O backend normaliza para `postgresql+asyncpg://` quando necessário.
+- SECRET_KEY: já configurada para ser gerada automaticamente no blueprint; você pode definir manualmente um valor forte.
+- ALGORITHM: `HS256` (default).
+- ACCESS_TOKEN_EXPIRE_MINUTES: `30` (default).
+
+Para funcionalidades de e-mail (recuperação de senha), configure também:
+- MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM, MAIL_SERVER, MAIL_PORT, MAIL_STARTTLS, MAIL_SSL_TLS
+
+Observações:
+- A aplicação faz bind em `0.0.0.0` e usa a porta `$PORT` definida pelo Render (via `render.yaml`).
+- O módulo `src/core/config.py` aceita URLs do banco no formato `postgres://` ou `postgresql://` e converte para `postgresql+asyncpg://` automaticamente.
+- Em ambiente de testes ou quando `DATABASE_URL` não está definida, a app usa `sqlite+aiosqlite:///./dev.db` para evitar falhas de inicialização.
+
+---
+
 ## 📖 Documentação
 
 A documentação interativa da API está disponível automaticamente:
