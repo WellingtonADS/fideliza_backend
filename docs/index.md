@@ -24,4 +24,4 @@ Consulte o `README.md` do projeto para os comandos detalhados.
 - MkDocs (tema Material)
 - mkdocstrings (handler Python) para inspecionar docstrings e anotações do código
 
-Para instalar dependências de documentação (opcional), consulte `requirements-docs.txt` na raiz do backend.
+

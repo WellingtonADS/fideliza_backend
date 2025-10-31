@@ -195,4 +195,4 @@ Este projeto está licenciado sob a [Licença MIT](https://opensource.org/licens
 
 ## 📧 Contato
 
-Para dúvidas ou suporte, entre em contato pelo e-mail: **wellingtonads@example.com**
+Para dúvidas ou suporte, entre em contato pelo e-mail: **welltonuchoa@gmail.com**
