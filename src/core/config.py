@@ -82,8 +82,24 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or v == "":
+        """Normaliza e valida a URL de banco.
+
+        - Aceita valores do Render em `postgres://` ou `postgresql://` e converte
+          para `postgresql+asyncpg://` (obrigatório para engine assíncrona).
+        - Remove espaços e aspas envolvendo o valor, caso existam.
+        - Mantém suporte a `sqlite+aiosqlite://` em dev/testes.
+        """
+        if v is None:
             return None
+        v = v.strip().strip("'\"")
+        if v == "":
+            return None
+
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+
         allowed_prefixes = ("postgresql+asyncpg://", "sqlite+aiosqlite://")
         if not v.startswith(allowed_prefixes):
             raise ValueError(
