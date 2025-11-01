@@ -45,6 +45,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def create_db_and_tables():
+    """Cria as tabelas do banco usando a engine atual."""
     _ensure_engine()
     assert _engine is not None
     async with _engine.begin() as conn:
