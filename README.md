@@ -132,26 +132,24 @@ src/
 
 ---
 
-## ☁️ Deploy no Render (via GitHub)
-
-Este repositório já inclui um arquivo `render.yaml` para provisionamento automático no Render usando integração com o GitHub.
+## ☁️ Deploy no Render (manual pelo painel)
 
 ### Passos
 
-1. Faça login no [Render](https://render.com/) e conecte sua conta do GitHub.
-2. Em New > Blueprint, selecione este repositório (contém `render.yaml`).
-3. Revise as configurações sugeridas e crie o blueprint.
-   - Um serviço Web (FastAPI) será criado com:
-     - Build: `pip install -r requirements.txt`
-     - Start: `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
-     - Health check: `/`
-   - Um banco Postgres (free) será criado e ligado via `DATABASE_URL`.
-4. Habilite Auto-Deploy na branch `main` (ou a de sua preferência).
+1. Acesse o [Render](https://render.com/) e conecte sua conta do GitHub.
+2. Crie um Web Service: New > Web Service > selecione este repositório.
+   - Build: `pip install -r requirements.txt`
+   - Start: `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
+   - Health check: `/`
+3. (Opcional) Crie um Postgres: New > PostgreSQL (plano Free) e aguarde provisionar.
+4. Em Settings > Environment do Web Service, defina as variáveis abaixo.
+   - Para `DATABASE_URL`, use a “Internal Database URL” do Postgres do Render (ou a URL do seu provedor externo). Não coloque aspas.
+5. Faça “Deploy latest commit” e acompanhe os logs.
 
 ### Variáveis de ambiente importantes
 
-- DATABASE_URL: fornecida automaticamente pelo serviço Postgres do Render (ex.: `postgres://...`). O backend normaliza para `postgresql+asyncpg://` quando necessário.
-- SECRET_KEY: já configurada para ser gerada automaticamente no blueprint; você pode definir manualmente um valor forte.
+- DATABASE_URL: use a URL do Postgres (Render ou externo). O backend normaliza `postgres://`/`postgresql://` para `postgresql+asyncpg://` automaticamente.
+- SECRET_KEY: defina um valor forte.
 - ALGORITHM: `HS256` (default).
 - ACCESS_TOKEN_EXPIRE_MINUTES: `30` (default).
 
@@ -159,13 +157,38 @@ Para funcionalidades de e-mail (recuperação de senha), configure também:
 - MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM, MAIL_SERVER, MAIL_PORT, MAIL_STARTTLS, MAIL_SSL_TLS
 
 Observações:
-- A aplicação faz bind em `0.0.0.0` e usa a porta `$PORT` definida pelo Render (via `render.yaml`).
-- O módulo `src/core/config.py` aceita URLs do banco no formato `postgres://` ou `postgresql://` e converte para `postgresql+asyncpg://` automaticamente.
-- Em ambiente de testes ou quando `DATABASE_URL` não está definida, a app usa `sqlite+aiosqlite:///./dev.db` para evitar falhas de inicialização.
+- A aplicação faz bind em `0.0.0.0` e usa a porta `$PORT` definida pelo Render.
+- O módulo `src/core/config.py` aceita URLs `postgres://`/`postgresql://` e converte para `postgresql+asyncpg://` automaticamente.
+- Em testes ou quando `DATABASE_URL` não está definida, a app usa `sqlite+aiosqlite:///./dev.db` para evitar falhas de inicialização.
 
 ---
 
-## 📖 Documentação
+## � Alternar entre banco local e Render
+
+Para facilitar o desenvolvimento, você pode alternar entre o banco local (DATABASE_URL) e o banco do Render (RENDER_DATABASE_URL) usando os scripts incluídos.
+
+Pré-requisitos:
+- No arquivo `.env`, preencha `RENDER_DATABASE_URL` com a External Connection String do Postgres no Render (ex.: `postgres://...sslmode=require`).
+- Mantenha sua `DATABASE_URL` local configurada quando quiser usar o Postgres local.
+
+Comandos (Windows PowerShell):
+
+```pwsh
+# Usar o banco do Render (define USE_RENDER_DB=true)
+./scripts/use-render-db.ps1
+
+# Voltar para o banco local (define USE_RENDER_DB=false)
+./scripts/use-local-db.ps1
+```
+
+Notas:
+- A flag `USE_RENDER_DB` é usada apenas no ambiente local para escolher entre `RENDER_DATABASE_URL` e `DATABASE_URL`.
+- Em produção no Render, defina as variáveis no painel do serviço (o Render não lê o `.env` do repositório).
+- O backend normaliza automaticamente `postgres://` e `postgresql://` para `postgresql+asyncpg://` (driver assíncrono do SQLAlchemy).
+
+---
+
+## �📖 Documentação
 
 A documentação interativa da API está disponível automaticamente:
 

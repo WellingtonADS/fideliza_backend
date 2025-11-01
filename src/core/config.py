@@ -39,6 +39,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Alternativa: URL do banco no Render + chave para alternar
+    RENDER_DATABASE_URL: Optional[str] = Field(
+        default=None,
+        description=(
+            "URL do BD no Render (pode vir como 'postgres://...'); será normalizada para 'postgresql+asyncpg://'."
+        ),
+    )
+    USE_RENDER_DB: bool = Field(
+        default=False,
+        description=(
+            "Quando true, usa RENDER_DATABASE_URL; quando false, usa DATABASE_URL."
+        ),
+    )
+
     # JWT
     SECRET_KEY: str = Field(
         default="dev-secret-key", description="Chave secreta do JWT"
@@ -79,7 +93,7 @@ class Settings(BaseSettings):
     # =============================
     # Validadores
     # =============================
-    @field_validator("DATABASE_URL")
+    @field_validator("DATABASE_URL", "RENDER_DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: Optional[str]) -> Optional[str]:
         """Normaliza e valida a URL de banco.

@@ -28,7 +28,9 @@ def _ensure_engine() -> None:
     if _engine is not None and _session_factory is not None:
         return
 
-    database_url = settings.DATABASE_URL or "sqlite+aiosqlite:///./dev.db"
+    # Permite alternar entre local e Render via USE_RENDER_DB
+    selected_url = settings.RENDER_DATABASE_URL if getattr(settings, "USE_RENDER_DB", False) else settings.DATABASE_URL
+    database_url = selected_url or "sqlite+aiosqlite:///./dev.db"
     _engine = create_async_engine(database_url, echo=True)
     _session_factory = async_sessionmaker(
         _engine, expire_on_commit=False, class_=AsyncSession
