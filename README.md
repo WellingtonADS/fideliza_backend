@@ -141,6 +141,7 @@ src/
    - Build: `pip install -r requirements.txt`
    - Start: `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
    - Health check: `/`
+   - Python: defina a versão via arquivo `runtime.txt` na raiz (ex.: `3.12.6`).
 3. (Opcional) Crie um Postgres: New > PostgreSQL (plano Free) e aguarde provisionar.
 4. Em Settings > Environment do Web Service, defina as variáveis abaixo.
    - Para `DATABASE_URL`, use a “Internal Database URL” do Postgres do Render (ou a URL do seu provedor externo). Não coloque aspas.
@@ -160,6 +161,7 @@ Observações:
 - A aplicação faz bind em `0.0.0.0` e usa a porta `$PORT` definida pelo Render.
 - O módulo `src/core/config.py` aceita URLs `postgres://`/`postgresql://` e converte para `postgresql+asyncpg://` automaticamente.
 - Em testes ou quando `DATABASE_URL` não está definida, a app usa `sqlite+aiosqlite:///./dev.db` para evitar falhas de inicialização.
+- Caso veja erro envolvendo `pydantic-core`/`maturin`/`cargo` durante o build, garanta que o `runtime.txt` define Python 3.12.x (há versões antigas sem wheels para 3.13, levando a tentativa de build nativa com Rust, que falha no Render).
 
 ---
 
